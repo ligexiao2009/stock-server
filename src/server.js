@@ -669,7 +669,7 @@ async function checkFundsAndAlert() {
           content += `- 当前净值: ${alert.currentNetValue.toFixed(4)}\n`;
           // 涨跌幅大于10%使用红色字体
           const changePercentText = `${isUp ? '+' : ''}${Math.abs(alert.changePercent).toFixed(2)}%`;
-          const changePercentFormatted = Math.abs(alert.changePercent) > 10 ? `<font color="red">${changePercentText}</font>` : changePercentText;
+          const changePercentFormatted = Math.abs(alert.changePercent) > 10 ? `${changePercentText}` : changePercentText;
           content += `- ${directionText}幅度: ${changePercentFormatted}\n`;
           content += `- 加仓日期: ${alert.lastAddDate}\n\n`;
         });
