@@ -1549,6 +1549,36 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ========== 指数行情 API ==========
+  if (req.method === 'GET' && req.url === '/api/indices') {
+    try {
+      await sendCachedJson(req, res, 'indices', async () => {
+        const url = 'https://qt.gtimg.cn/q=s_sh000001,s_sz399001,s_sz399006';
+        const resp = await fetch(url);
+        const text = await decodeQtResponse(resp);
+        const parsed = parseQuoteResponse(text);
+        const result = {};
+        const codes = ['sh000001', 'sz399001', 'sz399006'];
+        for (const code of codes) {
+          const parts = parsed.get(`s_${code}`);
+          if (parts) {
+            result[code] = {
+              code,
+              name: (parts[1] || '').replace(' ', ''),
+              price: parseFloat(parts[3]) || 0,
+              change: parseFloat(parts[5]) || 0,
+            };
+          }
+        }
+        return result;
+      }, { ttlMs: 30000 });
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // ========== 加密币行情 API ==========
   const CRYPTO_PAIRS = [
     { pair: 'BTC_USDT', code: 'BTC', name: 'Bitcoin' },
