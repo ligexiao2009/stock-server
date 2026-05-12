@@ -17,10 +17,9 @@ jobs:
           username: root
           key: ${{ secrets.SSH_KEY }}
           script: |
-            export NVM_DIR="$HOME/.nvm" [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             cd /root/product/finance-app
             git fetch origin 
             git checkout dev 
             git pull origin dev
-            npm install
-            pm2 start ./start.sh --interpreter bash --name stock
+            /root/.nvm/versions/node/v22.22.2/bin/npm install 
+            /root/.nvm/versions/node/v22.22.2/bin/pm2 restart stock || \ /root/.nvm/versions/node/v22.22.2/bin/pm2 start ./start.sh --interpreter bash --name stock
