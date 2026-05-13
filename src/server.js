@@ -11,6 +11,7 @@ const { handleAlertRulesRoutes, checkPriceAlerts, invalidateAlertCache } = requi
 const { handleFundScreenshotRoutes, loadCodeFixMap } = require('./routes/fund-screenshot');
 const { servePublicFile } = require('./utils/static-files');
 const { analyzeFund, analyzeMultipleFunds } = require('./utils/fund-drawdown');
+const { getFundDetail } = require('./utils/fund-detail');
 
 const PORT = 4000;
 const DATA_CACHE_TTL_MS = Number(process.env.DATA_CACHE_TTL_MS || 30 * 60 * 1000);
@@ -137,8 +138,45 @@ async function fetchQuotesBatch(items) {
   }
 
   const quotes = {};
-  for (let i = 0; i < normalizedItems.length; i += QUOTES_BATCH_SIZE) {
-    const batch = normalizedItems.slice(i, i + QUOTES_BATCH_SIZE);
+
+  // 分离港股（走新浪实时）和非港股（走腾讯）
+  const hkItems = normalizedItems.filter(item => item.code.length === 5 && !item.isFund);
+  const otherItems = normalizedItems.filter(item => !(item.code.length === 5 && !item.isFund));
+
+  // 新浪获取港股实时行情
+  if (hkItems.length > 0) {
+    try {
+      const hkCodes = hkItems.map(item => `hk${item.code}`).join(',');
+      const hkUrl = `https://hq.sinajs.cn/list=${hkCodes}`;
+      const resp = await fetch(hkUrl, { headers: { 'Referer': 'https://finance.sina.com.cn' } });
+      const buffer = await resp.arrayBuffer();
+      const text = new TextDecoder('gb18030').decode(buffer);
+      const lines = text.split(';').filter(line => line.trim().length > 10);
+
+      for (const line of lines) {
+        const match = line.match(/hq_str_hk(\d+)=\"(.+)\"/);
+        if (!match) continue;
+        const code = match[1];
+        const fields = match[2].split(',');
+        // 新浪格式: name(GBK), open, prevClose, high, low, price, changeAmt, changePct, ...
+        const price = parseFloat(fields[6]) || 0;
+        const change = parseFloat(fields[8]) || 0;
+        const key = `${code}:0`;
+        if (normalizedItems.find(i => i.key === key)) {
+          // 名称已经是中文，直接取 fields[1]
+          const rawName = fields[1] || '';
+          const name = rawName.includes('?') ? rawName.replace(/\?/g, '') : rawName;
+          quotes[key] = { code, isFund: false, name, price, change, priceDate: '' };
+        }
+      }
+    } catch (e) {
+      console.error('新浪港股行情获取失败:', e.message);
+    }
+  }
+
+  // 腾讯获取其他行情（A股/基金）
+  for (let i = 0; i < otherItems.length; i += QUOTES_BATCH_SIZE) {
+    const batch = otherItems.slice(i, i + QUOTES_BATCH_SIZE);
     if (!batch.length) continue;
 
     const query = batch.map(item => `s_${item.symbol}`).join(',');
@@ -1553,12 +1591,12 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/indices') {
     try {
       await sendCachedJson(req, res, 'indices', async () => {
-        const url = 'https://qt.gtimg.cn/q=s_sh000001,s_sz399001,s_sz399006';
+        const url = 'https://qt.gtimg.cn/q=s_sh000001,s_sz399001,s_sz399006,s_hkHSTECH';
         const resp = await fetch(url);
         const text = await decodeQtResponse(resp);
         const parsed = parseQuoteResponse(text);
         const result = {};
-        const codes = ['sh000001', 'sz399001', 'sz399006'];
+        const codes = ['sh000001', 'sz399001', 'sz399006', 'hkHSTECH'];
         for (const code of codes) {
           const parts = parsed.get(`s_${code}`);
           if (parts) {
@@ -1875,6 +1913,33 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ success: false, error: e.message }));
       }
     });
+    return;
+  }
+
+  // ========== 基金详情 API ==========
+  if (req.method === 'GET' && req.url.startsWith('/api/fund-detail/')) {
+    try {
+      const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+      const fundCode = parsedUrl.pathname.split('/api/fund-detail/')[1].replace(/\/$/, '');
+
+      // 查找用户持仓数据
+      let positionData = null;
+      try {
+        const rows = await db.getPositions();
+        const pos = rows.find(r => r.isFund && r.code === fundCode);
+        if (pos) positionData = { shares: pos.shares, cost: pos.cost };
+      } catch (_) {}
+
+      const cacheKey = `fund-detail:${fundCode}`;
+      await sendCachedJson(req, res, cacheKey, async () => {
+        const detail = await getFundDetail(fundCode, positionData);
+        return { ...detail, updatedAt: Date.now() };
+      }, { ttlMs: 10 * 60 * 1000 });
+    } catch (e) {
+      console.error('获取基金详情失败:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: e.message }));
+    }
     return;
   }
 
