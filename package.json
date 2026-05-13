@@ -28,7 +28,8 @@
     "node-fetch": "^2.7.0",
     "pg": "^8.20.0",
     "stock-api": "^2.3.0",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "yahoo-finance2": "^3.14.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
