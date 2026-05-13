@@ -41,24 +41,10 @@ function formatMoney(amount) {
 }
 
 async function getCachedJsonResponse(cacheKey, producer, options = {}) {
-  const { ttlMs = DATA_CACHE_TTL_MS, bypassCache = false } = options;
-  const now = Date.now();
-  const cached = responseCache.get(cacheKey);
-  if (!bypassCache && cached && cached.expiresAt > now) {
-    return cached;
-  }
-
   const data = await producer();
   const payload = JSON.stringify(data);
   const etag = `"${crypto.createHash('sha1').update(payload).digest('hex')}"`;
-  const nextCache = {
-    expiresAt: now + ttlMs,
-    etag,
-    payload,
-  };
-
-  responseCache.set(cacheKey, nextCache);
-  return nextCache;
+  return { etag, payload };
 }
 
 async function sendCachedJson(req, res, cacheKey, producer, options = {}) {
