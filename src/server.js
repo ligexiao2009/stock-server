@@ -139,44 +139,9 @@ async function fetchQuotesBatch(items) {
 
   const quotes = {};
 
-  // 分离港股（走新浪实时）和非港股（走腾讯）
-  const hkItems = normalizedItems.filter(item => item.code.length === 5 && !item.isFund);
-  const otherItems = normalizedItems.filter(item => !(item.code.length === 5 && !item.isFund));
-
-  // 新浪获取港股实时行情
-  if (hkItems.length > 0) {
-    try {
-      const hkCodes = hkItems.map(item => `hk${item.code}`).join(',');
-      const hkUrl = `https://hq.sinajs.cn/list=${hkCodes}`;
-      const resp = await fetch(hkUrl, { headers: { 'Referer': 'https://finance.sina.com.cn' } });
-      const buffer = await resp.arrayBuffer();
-      const text = new TextDecoder('gb18030').decode(buffer);
-      const lines = text.split(';').filter(line => line.trim().length > 10);
-
-      for (const line of lines) {
-        const match = line.match(/hq_str_hk(\d+)=\"(.+)\"/);
-        if (!match) continue;
-        const code = match[1];
-        const fields = match[2].split(',');
-        // 新浪格式: name(GBK), open, prevClose, high, low, price, changeAmt, changePct, ...
-        const price = parseFloat(fields[6]) || 0;
-        const change = parseFloat(fields[8]) || 0;
-        const key = `${code}:0`;
-        if (normalizedItems.find(i => i.key === key)) {
-          // 名称已经是中文，直接取 fields[1]
-          const rawName = fields[1] || '';
-          const name = rawName.includes('?') ? rawName.replace(/\?/g, '') : rawName;
-          quotes[key] = { code, isFund: false, name, price, change, priceDate: '' };
-        }
-      }
-    } catch (e) {
-      console.error('新浪港股行情获取失败:', e.message);
-    }
-  }
-
-  // 腾讯获取其他行情（A股/基金）
-  for (let i = 0; i < otherItems.length; i += QUOTES_BATCH_SIZE) {
-    const batch = otherItems.slice(i, i + QUOTES_BATCH_SIZE);
+  // 全部走腾讯接口
+  for (let i = 0; i < normalizedItems.length; i += QUOTES_BATCH_SIZE) {
+    const batch = normalizedItems.slice(i, i + QUOTES_BATCH_SIZE);
     if (!batch.length) continue;
 
     const query = batch.map(item => `s_${item.symbol}`).join(',');
