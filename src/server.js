@@ -1212,11 +1212,42 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ========== 以下接口需要登录 ==========
-  const auth = req.url.startsWith('/api/') && !req.url.startsWith('/api/register') && !req.url.startsWith('/api/login') && !req.url.startsWith('/api/trigger-') && !req.url.startsWith('/api/resend-code')
+  const auth = req.url.startsWith('/api/') && req.url !== '/api/config' && !req.url.startsWith('/api/register') && !req.url.startsWith('/api/login') && !req.url.startsWith('/api/trigger-') && !req.url.startsWith('/api/resend-code')
     ? authRequired()
     : true;
   if (!auth) return;
   const userId = auth?.uid || 'default';
+  const adminEmail = process.env.ADMIN_EMAIL || (await db.getConfig('admin_email'));
+  const isAdmin = !!(auth?.email && adminEmail && auth.email === adminEmail);
+
+  // ========== 管理员 API ==========
+  if (isAdmin && req.method === 'GET' && req.url === '/api/admin/configs') {
+    const configs = await db.getAllConfigs();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(configs));
+    return;
+  }
+  if (isAdmin && req.method === 'POST' && req.url === '/api/admin/config') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      const { key, value } = JSON.parse(body);
+      await db.setConfig(key, value);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    });
+    return;
+  }
+
+  // 公开汇率接口
+  if (req.method === 'GET' && req.url === '/api/config') {
+    const hkd = await db.getConfig('hkd_cny_rate') || '0.93';
+    const usd = await db.getConfig('crypto_fx') || '7.25';
+    const adminEmail = await db.getConfig('admin_email') || '';
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ hkd_cny_rate: hkd, crypto_fx: usd, admin_email: adminEmail }));
+    return;
+  }
 
   if ((req.method === 'GET' || req.method === 'HEAD') && req.url === '/') {
     if (servePublicFile(req, res, '/stock.html')) {
