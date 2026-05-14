@@ -336,7 +336,17 @@ async function deleteTradeRecord(id) {
 async function getDailyProfits(userId = null) {
   if (userId) {
     const res = await query('SELECT * FROM daily_profits WHERE user_id = $1 ORDER BY date DESC', [userId]);
-    return res.rows;
+    return res.rows.map(row => {
+      const converted = snakeToCamel(row);
+      converted.stockToday = parseFloat(converted.stockToday) || 0;
+      converted.fundToday = parseFloat(converted.fundToday) || 0;
+      converted.totalToday = parseFloat(converted.totalToday) || 0;
+      if (converted.date) {
+  const d = new Date(converted.date);
+  converted.date = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+      return converted;
+    });
   }
   const res = await query('SELECT * FROM daily_profits ORDER BY date DESC');
   // Convert snake_case database fields to camelCase for frontend
