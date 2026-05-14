@@ -3,9 +3,51 @@ require('dotenv').config();
 
 const http = require('http');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const cron = require('node-cron');
 const fetch = require('node-fetch');
 const db = require('./db/db');
+
+const nodemailer = require('nodemailer');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'stock-app-secret-key-change-in-production';
+const JWT_EXPIRES = '30d';
+
+// 邮件配置
+let mailer = null;
+function getMailer() {
+  if (mailer) return mailer;
+  if (process.env.SMTP_HOST) {
+    mailer = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '465'),
+      secure: process.env.SMTP_SECURE !== 'false',
+      auth: {
+        user: process.env.SMTP_USER || process.env.EMAIL_SENDER,
+        pass: process.env.SMTP_PASS || process.env.EMAIL_PASSWORD,
+      },
+    });
+  }
+  return mailer;
+}
+
+async function sendVerifyCode(email, code) {
+  const transport = getMailer();
+  if (!transport) return false;
+  try {
+    await transport.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER || process.env.EMAIL_SENDER,
+      to: email,
+      subject: '投资助手 - 邮箱验证码',
+      text: `您的验证码是：${code}，10分钟内有效。`,
+    });
+    return true;
+  } catch (e) {
+    console.error('发送邮件失败:', e.message);
+    return false;
+  }
+}
 const { handleDailyProfitRoutes } = require('./routes/daily-profit');
 const { handleAlertRulesRoutes, checkPriceAlerts, invalidateAlertCache } = require('./routes/alert-rules');
 const { handleFundScreenshotRoutes, loadCodeFixMap } = require('./routes/fund-screenshot');
@@ -322,6 +364,7 @@ async function startServer() {
   try {
     // 初始化数据库连接
     await db.initDatabase();
+    await db.runMigration();
     console.log('✅ 数据库连接初始化完成');
 
     // 初始化配置
@@ -1049,13 +1092,140 @@ async function setupCronJob() {
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
     res.end();
     return;
   }
+
+  // ========== 认证中间件 ==========
+  function authRequired() {
+    const header = req.headers['authorization'] || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+    try {
+      return jwt.verify(token, JWT_SECRET);
+    } catch (_) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: '未登录或登录已过期' }));
+      return null;
+    }
+  }
+
+  // ========== 登录注册 API ==========
+  if (req.method === 'POST' && req.url === '/api/register') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { email, password, code } = JSON.parse(body);
+        if (!email || !password || password.length < 4) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '邮箱不能为空，密码至少4位' }));
+          return;
+        }
+        // 检查邮箱是否已注册
+        const existCheck = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (existCheck.rows.length > 0) {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '该邮箱已注册' }));
+          return;
+        }
+
+        // 检查是否需要邮箱验证
+        const verifyConfig = await db.getConfig('require_email_verify');
+        if (verifyConfig === 'true' || verifyConfig === true) {
+          if (!code) {
+            // 发送验证码
+            const verifyCode = String(Math.floor(100000 + Math.random() * 900000));
+            global.pendingVerifies = global.pendingVerifies || {};
+            global.pendingVerifies[email] = { code: verifyCode, expires: Date.now() + 10 * 60 * 1000 };
+            const sent = await sendVerifyCode(email, verifyCode);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ needVerify: true, message: sent ? '验证码已发送' : '验证码发送失败，请检查邮箱' }));
+            return;
+          }
+          // 校验验证码
+          const pending = (global.pendingVerifies || {})[email];
+          if (!pending || pending.code !== code || pending.expires < Date.now()) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '验证码错误或已过期' }));
+            return;
+          }
+          delete global.pendingVerifies[email];
+        }
+        const hash = await bcrypt.hash(password, 10);
+        const uid = crypto.randomBytes(12).toString('hex');
+        await db.query('INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3)', [uid, email, hash]);
+        const token = jwt.sign({ uid, email }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ token, uid, email }));
+      } catch (e) {
+        if (e.code === '23505') {
+          res.writeHead(409, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '该邮箱已注册' }));
+        } else {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: e.message }));
+        }
+      }
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/api/resend-code') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      const { email } = JSON.parse(body);
+      if (!email) { res.writeHead(400); res.end(JSON.stringify({error:'缺少邮箱'})); return; }
+      const verifyCode = String(Math.floor(100000 + Math.random() * 900000));
+      global.pendingVerifies = global.pendingVerifies || {};
+      global.pendingVerifies[email] = { code: verifyCode, expires: Date.now() + 10 * 60 * 1000 };
+      const sent = await sendVerifyCode(email, verifyCode);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: sent, message: sent ? '验证码已重新发送' : '发送失败' }));
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/api/login') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { email, password } = JSON.parse(body);
+        const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (result.rows.length === 0) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '邮箱或密码错误' }));
+          return;
+        }
+        const user = result.rows[0];
+        const valid = await bcrypt.compare(password, user.password_hash);
+        if (!valid) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '邮箱或密码错误' }));
+          return;
+        }
+        const token = jwt.sign({ uid: user.id, email: user.email }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ token, uid: user.id, email: user.email }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ========== 以下接口需要登录 ==========
+  const auth = req.url.startsWith('/api/') && !req.url.startsWith('/api/register') && !req.url.startsWith('/api/login')
+    ? authRequired()
+    : true;
+  if (!auth) return;
+  const userId = auth?.uid || 'default';
 
   if ((req.method === 'GET' || req.method === 'HEAD') && req.url === '/') {
     if (servePublicFile(req, res, '/stock.html')) {
@@ -1080,6 +1250,24 @@ const server = http.createServer(async (req, res) => {
     checkFundsAndAlert();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, message: '检查已触发' }));
+    return;
+  }
+
+  // 配置开关
+  if (req.method === 'POST' && req.url === '/api/config') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { key, value } = JSON.parse(body);
+        await db.setConfig(key, String(value));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
     return;
   }
 
@@ -1151,7 +1339,7 @@ const server = http.createServer(async (req, res) => {
             return { code, isFund: isFundFlag === '1' };
           });
       } else {
-        const rows = await db.getPositions();
+        const rows = await db.getPositions(userId);
         items = rows.map(row => ({ code: row.code, isFund: row.isFund }));
       }
 
@@ -1181,7 +1369,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/pending-trades') {
     try {
       await sendCachedJson(req, res, 'pending-trades', async () => {
-        const trades = await db.getPendingTrades();
+        const trades = await db.getPendingTrades(userId);
+        console.log('pending-trades userId:', userId, 'count:', trades.length);
         return { trades };
       });
     } catch (error) {
@@ -1199,6 +1388,7 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const trade = JSON.parse(body);
+        trade.user_id = userId;
         await db.createPendingTrade(trade);
         invalidateCache('pending-trades');
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1243,8 +1433,11 @@ const server = http.createServer(async (req, res) => {
         // 先删除所有现有交易
         await db.deleteAllPendingTrades();
 
+        // 先删除当前用户的所有现有交易
+        await db.deleteAllPendingTrades(userId);
         // 批量插入新交易
         for (const trade of trades) {
+          trade.user_id = userId;
           await db.createPendingTrade(trade);
         }
 
@@ -1265,7 +1458,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/trade-history') {
     try {
       await sendCachedJson(req, res, 'trade-history', async () => {
-        const history = await db.getTradeHistory();
+        const history = await db.getTradeHistory(userId);
         return { history };
       });
     } catch (error) {
@@ -1441,6 +1634,7 @@ const server = http.createServer(async (req, res) => {
             alert: rowData.alert || null,
             targetPrice: rowData.targetPrice || null,
             categoryId: rowData.categoryId || null,
+            userId,
           });
         }
 
@@ -1516,7 +1710,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/data') {
     try {
       await sendCachedJson(req, res, 'data', async () => {
-        const rows = await db.getPositions();
+        const rows = await db.getPositions(userId);
         return { rows };
       });
     } catch (error) {
@@ -1527,7 +1721,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (await handleDailyProfitRoutes(req, res)) {
+  if (await handleDailyProfitRoutes(req, res, userId)) {
     return;
   }
 
@@ -1702,7 +1896,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/assets') {
     try {
       await sendCachedJson(req, res, 'assets', async () => {
-        return await db.getAssetRecords();
+        return await db.getAssetRecords(userId);
       });
     } catch (error) {
       console.error('Error getting asset records:', error);
@@ -1879,7 +2073,7 @@ const server = http.createServer(async (req, res) => {
       // 查找用户持仓数据
       let positionData = null;
       try {
-        const rows = await db.getPositions();
+        const rows = await db.getPositions(userId);
         const pos = rows.find(r => r.isFund && r.code === fundCode);
         if (pos) positionData = { shares: pos.shares, cost: pos.cost };
       } catch (_) {}
