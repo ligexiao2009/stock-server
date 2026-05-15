@@ -288,12 +288,14 @@ async function getFundDetail(fundCode, positionData = null) {
   if (positionData && positionData.shares > 0) {
     const shares = positionData.shares;
     const cost = positionData.cost;
-    const latestNav = navTrend.length > 0 ? navTrend[navTrend.length - 1].unitNav : 0;
+    // 优先用实时净值，比 pingzhongdata 的 navTrend 更新
+    const latestNav = (fundQuote && fundQuote.price > 0) ? fundQuote.price : (navTrend.length > 0 ? navTrend[navTrend.length - 1].unitNav : 0);
     const marketValue = shares * latestNav;
     const profitLoss = shares * (latestNav - cost);
     const todayChange = fundQuote ? fundQuote.change : 0;
     const priceDate = fundQuote ? fundQuote.priceDate : '';
-    const todayProfit = marketValue * (todayChange / 100);
+    const prevMkt = (1 + todayChange / 100) !== 0 ? marketValue / (1 + todayChange / 100) : marketValue;
+    const todayProfit = prevMkt * (todayChange / 100);
     myPosition = {
       shares,
       cost,
