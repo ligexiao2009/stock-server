@@ -83,14 +83,14 @@ async function setupCronJob() {
     { timezone: 'Asia/Shanghai' });
 
   // 股票涨跌幅提醒（交易时间每分钟）
-  global.alertCheckCronJob = cron.schedule('* 9-11,13-14 * * 1-5', () => {
-    const now = new Date();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
-    const isMorning = (hour === 9 && minute >= 30) || (hour === 10) || (hour === 11 && minute <= 30);
-    const isAfternoon = hour === 13 || hour === 14 || (hour === 15 && minute === 0);
-    if (isMorning || isAfternoon) checkPriceAlerts(fetchQuotesBatch, sendWechatMessage);
-  }, { timezone: 'Asia/Shanghai' });
+  // global.alertCheckCronJob = cron.schedule('* 9-11,13-14 * * 1-5', () => {
+  //   const now = new Date();
+  //   const hour = now.getHours();
+  //   const minute = now.getMinutes();
+  //   const isMorning = (hour === 9 && minute >= 30) || (hour === 10) || (hour === 11 && minute <= 30);
+  //   const isAfternoon = hour === 13 || hour === 14 || (hour === 15 && minute === 0);
+  //   if (isMorning || isAfternoon) checkPriceAlerts(fetchQuotesBatch, sendWechatMessage);
+  // }, { timezone: 'Asia/Shanghai' });
 
   // 开盘前重置提醒状态
   global.alertResetCronJob = cron.schedule('25 9 * * 1-5', () => {
@@ -105,7 +105,6 @@ async function setupCronJob() {
 async function startServer() {
   try {
     await db.initDatabase();
-    await db.runMigration();
     console.log('数据库连接初始化完成');
 
     await initConfig();

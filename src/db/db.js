@@ -634,15 +634,4 @@ module.exports = {
   deleteAssetRecord,
   deleteAllAssetRecords,
 
-  // 迁移
-  async runMigration() {
-    const fs = require('fs');
-    const path = require('path');
-    const sql = fs.readFileSync(path.join(__dirname, 'migration-users.sql'), 'utf-8');
-    const statements = sql.split(';').filter(s => s.trim());
-    for (const stmt of statements) {
-      try { await query(stmt); } catch (e) { if (!e.message.includes('already exists') && !e.message.includes('duplicate')) console.log('Migration skip:', e.message.split('\n')[0]); }
-    }
-    console.log('✅ 用户系统迁移完成');
-  },
 };

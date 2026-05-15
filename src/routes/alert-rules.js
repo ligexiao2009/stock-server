@@ -4,6 +4,18 @@
 
 const db = require('../db/db');
 
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+      try { resolve(JSON.parse(body || '{}')); }
+      catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
+
 // ==================== 缓存配置 ====================
 // 价格缓存，避免频繁请求
 const priceCheckCache = new Map();
@@ -11,8 +23,8 @@ const priceCheckCache = new Map();
 // 数据库查询缓存
 let alertRulesCache = { data: null, expiresAt: 0 };
 let positionsCache = { data: null, expiresAt: 0 };
-const DB_CACHE_TTL = 90 * 1000 * 1000; // 90秒缓存，覆盖下一个检查周期
-const PRICE_CHECK_CACHE_TTL = 10 * 1000; // 45秒价格缓存
+const DB_CACHE_TTL = 90 * 1000;           // 90秒缓存，覆盖下一个检查周期
+const PRICE_CHECK_CACHE_TTL = 45 * 1000;   // 45秒价格缓存
 
 // ==================== 缓存函数 ====================
 async function getCachedAlertRules() {
@@ -227,52 +239,43 @@ async function handleAlertRulesRoutes(req, res, { sendCachedJson, invalidateCach
 
   // 新增提醒规则
   if (req.method === 'POST' && req.url === '/api/alert-rules') {
-    let body = '';
-    req.on('data', chunk => { body += chunk.toString(); });
-    req.on('end', async () => {
-      try {
-        const rule = JSON.parse(body);
-        // 检查该持仓是否已有3条规则
-        const existingRules = await db.getAlertRulesByPositionId(rule.positionId);
-        if (existingRules.length >= 3) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, message: '每只股票最多只能配置3条提醒规则' }));
-          return;
-        }
-        rule.id = rule.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
-        await db.createAlertRule(rule);
-        invalidateCache('alert-rules');
-        invalidateAlertCache();
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, rule }));
-      } catch (e) {
-        console.error('Error creating alert rule:', e);
+    try {
+      const rule = await readJsonBody(req);
+      const existingRules = await db.getAlertRulesByPositionId(rule.positionId);
+      if (existingRules.length >= 3) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, message: e.message }));
+        res.end(JSON.stringify({ success: false, message: '每只股票最多只能配置3条提醒规则' }));
+        return true;
       }
-    });
+      rule.id = rule.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      await db.createAlertRule(rule);
+      invalidateCache('alert-rules');
+      invalidateAlertCache();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, rule }));
+    } catch (e) {
+      console.error('Error creating alert rule:', e);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, message: e.message }));
+    }
     return true;
   }
 
   // 更新提醒规则
   if (req.method === 'PUT' && req.url.startsWith('/api/alert-rules/')) {
-    let body = '';
-    req.on('data', chunk => { body += chunk.toString(); });
-    req.on('end', async () => {
-      try {
-        const ruleId = req.url.split('/api/alert-rules/')[1];
-        const updates = JSON.parse(body);
-        await db.updateAlertRule(ruleId, updates);
-        invalidateCache('alert-rules');
-        invalidateAlertCache();
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true }));
-      } catch (e) {
-        console.error('Error updating alert rule:', e);
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, message: e.message }));
-      }
-    });
+    try {
+      const ruleId = req.url.split('/api/alert-rules/')[1];
+      const updates = await readJsonBody(req);
+      await db.updateAlertRule(ruleId, updates);
+      invalidateCache('alert-rules');
+      invalidateAlertCache();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (e) {
+      console.error('Error updating alert rule:', e);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, message: e.message }));
+    }
     return true;
   }
 
