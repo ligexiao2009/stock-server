@@ -2180,6 +2180,71 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ========== 基金转换 API ==========
+  if (req.method === 'POST' && req.url === '/api/fund-convert') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { fromId, toId, fromShares, isBefore15 } = JSON.parse(body);
+        const fromPos = await db.getPosition(fromId);
+        const toPos = await db.getPosition(toId);
+        if (!fromPos || !toPos) {
+          res.writeHead(400); res.end(JSON.stringify({ error: '持仓不存在' })); return;
+        }
+        if (fromPos.shares < fromShares) {
+          res.writeHead(400); res.end(JSON.stringify({ error: '份额不足' })); return;
+        }
+
+        // 获取转入基金净值
+        const fundData = await fetchFundNetValue(toPos.code);
+        if (!fundData || !fundData.netValue) {
+          res.writeHead(400); res.end(JSON.stringify({ error: '获取基金净值失败' })); return;
+        }
+
+        let fromPriceDate = '';
+        const fromFundData = await fetchFundNetValue(fromPos.code);
+        if (fromFundData) fromPriceDate = fromFundData.priceDate;
+
+        const now = beijingTime();
+        const tradeId = `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+
+        // 转出：减仓
+        const fromRemain = parseFloat((fromPos.shares - fromShares).toFixed(2));
+        await db.updatePosition(fromId, { shares: fromRemain, cost: fromPos.cost });
+        await db.createPendingTrade({
+          id: `${tradeId}-out`, rowId: fromId, code: fromPos.code, name: fromPos.name,
+          type: 'reduce', amount: 0, shares: fromShares, isBefore15, createdAt: now,
+        });
+
+        // 转入：加仓
+        const fromAmount = fromShares * (fromFundData?.netValue || 0);
+        const toNewShares = fromAmount / fundData.netValue;
+        const toTotalShares = (toPos.shares || 0) + toNewShares;
+        const toNewCost = toTotalShares > 0 ? ((toPos.shares || 0) * (toPos.cost || 0) + fromAmount) / toTotalShares : fundData.netValue;
+
+        await db.updatePosition(toId, {
+          shares: parseFloat(toTotalShares.toFixed(2)),
+          cost: parseFloat(toNewCost.toFixed(4)),
+        });
+        await db.createPendingTrade({
+          id: `${tradeId}-in`, rowId: toId, code: toPos.code, name: toPos.name,
+          type: 'add', amount: Math.round(fromAmount), shares: parseFloat(toNewShares.toFixed(2)),
+          isBefore15, createdAt: now,
+        });
+
+        invalidateCache('data', 'pending-trades');
+        invalidateCacheByPrefix('quotes:');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   if (await handleFundScreenshotRoutes(req, res, { fetchQuotesBatch })) {
     return;
   }
