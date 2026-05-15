@@ -148,11 +148,12 @@ async function mergeWithStockQuotes(holdings) {
   const symbols = holdings.map(h => {
     const code = h.code;
     // 5位港股代码走 hk 前缀
-    if (code.length === 5) return `hk${code}`;
+    if (code.length === 5 && /^\d+$/.test(code)) return `hk${code}`;
+    // 纯字母美股代码走 us 前缀
+    if (/^[A-Z]+$/.test(code)) return `us${code}`;
     const first = code.charAt(0);
     return first === '6' || first === '5' ? `sh${code}` : `sz${code}`;
   });
-
   let quotes = {};
   try {
     const query = symbols.map(s => `s_${s}`).join(',');
@@ -165,7 +166,7 @@ async function mergeWithStockQuotes(holdings) {
       const match = text.match(pattern);
       if (match) {
         const fields = match[1].split('~');
-        quotes[sym.replace(/^(sh|sz|hk)/, '')] = {
+        quotes[sym.replace(/^(sh|sz|hk|us)/, '')] = {
           price: parseFloat(fields[3]) || 0,
           change: parseFloat(fields[5]) || 0,
         };
