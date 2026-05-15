@@ -38,25 +38,22 @@ async function fetchMinuteData(symbol) {
   }
 }
 
-// 获取 K 线数据（复用现有）
+// 获取 K 线数据（前复权）
 async function fetchKline(symbol) {
   try {
-    const url = symbol.startsWith('hk')
-      ? `https://web.ifzq.gtimg.cn/appstock/app/hkfqkline/get?_var=kline_day&param=${symbol},day,,,365,qfq`
-      : `http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${symbol}&scale=240&ma=no&datalen=365`;
+    const url = `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=kline_day&param=${symbol},day,,,365,qfq`;
     const resp = await fetch(url);
     if (!resp.ok) return [];
     const text = await resp.text();
     const jsonText = text.includes('=') ? text.slice(text.indexOf('=') + 1).replace(/;$/, '').trim() : text;
     const payload = JSON.parse(jsonText);
     const stockData = payload?.data?.[symbol];
-    const list = stockData ? (stockData.qfqday || stockData.day || []) : (Array.isArray(payload) ? payload : []);
+    const list = stockData ? (stockData.qfqday || stockData.day || []) : [];
     return list.map(item => {
       if (Array.isArray(item) && item.length >= 5) {
         return { day: String(item[0]), open: String(item[1]), close: String(item[2]), high: String(item[3]), low: String(item[4]), volume: String(item[5] || '0') };
       }
-      const o = item || {};
-      return { day: String(o.day || ''), open: String(o.open || ''), close: String(o.close || ''), high: String(o.high || ''), low: String(o.low || ''), volume: String(o.volume || '0') };
+      return null;
     }).filter(Boolean);
   } catch (e) {
     console.error('获取K线失败:', e.message);
