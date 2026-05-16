@@ -14,44 +14,14 @@ function makeETag(data) {
   return crypto.createHash('md5').update(JSON.stringify(data)).digest('hex').substring(0, 16);
 }
 
-/** 带缓存的 JSON 响应。如果客户端发来 If-None-Match 且匹配，返回 304。 */
+/** 无缓存 JSON 响应 — 每次返回最新数据 */
 async function sendCachedJson(req, res, key, dataFn, opts = {}) {
-  const { ttlMs = DEFAULT_TTL_MS, bypassCache = false } = opts;
-
-  // 检查 If-None-Match
-  const clientETag = req.headers['if-none-match'];
-  const cached = store.get(key);
-
-  if (!bypassCache && cached && clientETag && cached.etag === clientETag) {
-    res.writeHead(304, { 'ETag': cached.etag });
-    res.end();
-    return;
-  }
-
-  // 缓存命中且未过期
-  if (!bypassCache && cached && cached.expiresAt > Date.now()) {
-    res.writeHead(200, {
-      'Content-Type': 'application/json',
-      'ETag': cached.etag,
-      'Cache-Control': `max-age=${Math.floor(ttlMs / 1000)}`,
-    });
-    res.end(cached.body);
-    return;
-  }
-
-  // 执行数据获取函数
   const data = await dataFn();
-  const body = JSON.stringify(data);
-  const etag = makeETag(body);
-
-  store.set(key, { body, etag, expiresAt: Date.now() + ttlMs });
-
   res.writeHead(200, {
     'Content-Type': 'application/json',
-    'ETag': etag,
-    'Cache-Control': `max-age=${Math.floor(ttlMs / 1000)}`,
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
   });
-  res.end(body);
+  res.end(JSON.stringify(data));
 }
 
 /** 使指定缓存键失效 */
