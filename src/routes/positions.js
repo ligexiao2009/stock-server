@@ -58,13 +58,32 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
           targetPrice: rowData.targetPrice || null, categoryId: rowData.categoryId || null,
         });
       } else {
+        const newId = rowData.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
         await db.createPosition({
-          id: rowData.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          code: rowData.code, name: rowData.name,
+          id: newId, code: rowData.code, name: rowData.name,
           shares: rowData.shares, cost: rowData.cost,
           isFund: rowData.isFund || false, isOverseas: rowData.isOverseas || false,
           planBuy: rowData.planBuy || 0, alert: rowData.alert || null,
           targetPrice: rowData.targetPrice || null, categoryId: rowData.categoryId || null,
+          userId,
+        });
+
+        // 建仓自动创建一条交易记录
+        const now = new Date();
+        const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+        const createdAt = beijingTime.toISOString().replace('T', ' ').slice(0, 19);
+        const localDate = beijingTime.toISOString().slice(0, 10);
+        const amount = (rowData.shares || 0) * (rowData.cost || 0);
+        await db.createTradeRecord({
+          id: `${newId}-${Date.now()}`,
+          rowId: newId,
+          type: 'add',
+          amount: Math.round(amount * 100) / 100,
+          shares: rowData.shares,
+          netValue: rowData.cost,
+          isBefore15: true,
+          createdAt,
+          localDate,
           userId,
         });
       }
