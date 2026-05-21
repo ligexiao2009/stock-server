@@ -122,6 +122,23 @@ CREATE INDEX IF NOT EXISTS idx_alert_rules_position_id ON alert_rules(position_i
 CREATE INDEX IF NOT EXISTS idx_alert_rules_enabled     ON alert_rules(enabled);
 CREATE INDEX IF NOT EXISTS idx_alert_rules_user_id     ON alert_rules(user_id);
 
+-- ==================== 基金每日收益明细表 ====================
+CREATE TABLE IF NOT EXISTS fund_daily_profits (
+    id          SERIAL PRIMARY KEY,
+    position_id VARCHAR(50) NOT NULL,
+    code        VARCHAR(20) NOT NULL,
+    date        DATE NOT NULL,
+    profit      DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    nav         DECIMAL(15, 4) NOT NULL DEFAULT 0,
+    shares      DECIMAL(15, 4) NOT NULL DEFAULT 0,
+    market_value DECIMAL(15, 2) NOT NULL DEFAULT 0,
+    user_id     VARCHAR(50) NOT NULL DEFAULT 'default',
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (position_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_fund_daily_profits_position ON fund_daily_profits(position_id, date);
+
 -- ==================== 资产记录表 ====================
 CREATE TABLE IF NOT EXISTS asset_records (
     id          SERIAL PRIMARY KEY,

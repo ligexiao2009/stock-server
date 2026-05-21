@@ -122,6 +122,20 @@ async function handleFundRoutes(req, res, { userId, sendCachedJson, invalidateCa
     return true;
   }
 
+  // ========== 基金每日收益 ==========
+
+  // GET /api/fund-daily-profits/:positionId
+  if (req.method === 'GET' && req.url.startsWith('/api/fund-daily-profits/')) {
+    try {
+      const positionId = req.url.split('/api/fund-daily-profits/')[1];
+      const rows = await db.getFundDailyProfits(positionId);
+      sendJson(res, 200, { success: true, profits: rows });
+    } catch (e) {
+      sendJson(res, 500, { success: false, error: e.message });
+    }
+    return true;
+  }
+
   // ========== 基金详情 ==========
 
   // GET /api/fund-detail/:code

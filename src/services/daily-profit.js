@@ -75,6 +75,22 @@ async function calculateAndSaveDailyProfit() {
           const today = prevMkt * (fundData.change / 100);
           fundToday += today;
           details.push({ code: fund.code, name: fund.name || fund.code, type: 'fund', change: fundData.change, profit: Math.round(today) });
+
+          // 保存单只基金收益明细
+          try {
+            await db.saveFundDailyProfit({
+              positionId: fund.id,
+              code: fund.code,
+              date: dateStr,
+              profit: Math.round(today * 100) / 100,
+              nav: fundData.netValue,
+              shares: fund.shares,
+              marketValue: Math.round(mkt * 100) / 100,
+              userId,
+            });
+          } catch (e) {
+            console.error(`保存基金 ${fund.code} 收益失败:`, e.message);
+          }
         }
       }
     }

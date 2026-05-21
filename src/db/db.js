@@ -53,7 +53,7 @@ async function query(text, params) {
 }
 
 // 修复 DECIMAL 字段：PG 返回字符串，转数字
-const NUMERIC_FIELDS = new Set(['amount', 'shares', 'netValue', 'net_value', 'price', 'change', 'cost', 'stockToday', 'stock_today', 'fundToday', 'fund_today', 'totalToday', 'total_today', 'marketValue', 'profitLoss']);
+const NUMERIC_FIELDS = new Set(['amount', 'shares', 'netValue', 'net_value', 'price', 'change', 'cost', 'stockToday', 'stock_today', 'fundToday', 'fund_today', 'totalToday', 'total_today', 'marketValue', 'market_value', 'profitLoss', 'profit', 'nav']);
 function fixNumericFields(row) {
   const r = { ...row };
   for (const k of Object.keys(r)) {
@@ -425,6 +425,26 @@ async function deleteDailyProfit(date) {
   await query('DELETE FROM daily_profits WHERE date = $1', [date]);
 }
 
+// ==================== 基金每日收益明细表操作 ====================
+
+async function getFundDailyProfits(positionId) {
+  const res = await query(
+    'SELECT date::text, profit, nav, shares, market_value FROM fund_daily_profits WHERE position_id = $1 ORDER BY date ASC',
+    [positionId]
+  );
+  return res.rows.map(fixNumericFields);
+}
+
+async function saveFundDailyProfit(record) {
+  const { positionId, code, date, profit, nav, shares, marketValue, userId } = record;
+  await query(
+    `INSERT INTO fund_daily_profits (position_id, code, date, profit, nav, shares, market_value, user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (position_id, date) DO UPDATE SET profit = $4, nav = $5, shares = $6, market_value = $7`,
+    [positionId, code, date, profit, nav, shares, marketValue, userId || 'default']
+  );
+}
+
 // ==================== 股票涨跌幅提醒规则表操作 ====================
 async function getAlertRules() {
   const res = await query('SELECT * FROM alert_rules ORDER BY created_at ASC');
@@ -612,6 +632,8 @@ module.exports = {
   getDailyProfitByDateAndUser,
   createDailyProfit,
   deleteDailyProfit,
+  getFundDailyProfits,
+  saveFundDailyProfit,
 
   // Alert rules operations
   getAlertRules,
