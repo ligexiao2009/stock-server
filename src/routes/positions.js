@@ -49,11 +49,12 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
         existingPosition = await db.getPositionByCode(rowData.code, rowData.isFund);
       }
 
+      const isOverseas = rowData.categoryId === 'us_stock';
       if (existingPosition) {
         await db.updatePosition(existingPosition.id, {
           code: rowData.code, name: rowData.name,
           shares: rowData.shares, cost: rowData.cost,
-          isFund: rowData.isFund, isOverseas: rowData.isOverseas || false,
+          isFund: rowData.isFund, isOverseas,
           planBuy: rowData.planBuy || 0, alert: rowData.alert || null,
           targetPrice: rowData.targetPrice || null, categoryId: rowData.categoryId || null,
         });
@@ -62,7 +63,7 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
         await db.createPosition({
           id: newId, code: rowData.code, name: rowData.name,
           shares: rowData.shares, cost: rowData.cost,
-          isFund: rowData.isFund || false, isOverseas: rowData.isOverseas || false,
+          isFund: rowData.isFund || false, isOverseas,
           planBuy: rowData.planBuy || 0, alert: rowData.alert || null,
           targetPrice: rowData.targetPrice || null, categoryId: rowData.categoryId || null,
           userId,
@@ -129,7 +130,7 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
   if (req.method === 'POST' && req.url === '/api/update-category') {
     try {
       const { id, categoryId } = await readJsonBody(req);
-      await db.updatePosition(id, { categoryId });
+      await db.updatePosition(id, { categoryId, isOverseas: categoryId === 'us_stock' });
       invalidateCache('data');
       sendJson(res, 200, { success: true });
     } catch (e) {
