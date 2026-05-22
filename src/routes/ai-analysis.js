@@ -92,7 +92,7 @@ async function handleAIAnalysisRoutes(req, res) {
           fundamental_analysis: rawResult.fundamental_analysis || '',
           risk_warning: rawResult.risk_warning || '',
           news_content: rawResult.news_content || '',
-          ma_status: trend.ma_status || '',
+          ma_status: trend.ma_alignment || trend.ma_status || '',
           ma5: today.ma5 || 0,
           ma10: today.ma10 || 0,
           ma20: today.ma20 || 0,
