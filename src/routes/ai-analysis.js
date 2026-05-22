@@ -141,7 +141,9 @@ async function handleAIAnalysisRoutes(req, res) {
   if (req.method === 'POST' && req.url === '/api/ai-analysis/market-review') {
     try {
       const { exec } = require('child_process');
-      exec(`cd ${pyDir} && python3 main.py`, { timeout: 300000 }, (err, stdout, stderr) => {
+      const useProxy = process.env.AI_USE_PROXY ? `HTTP_PROXY=${process.env.AI_USE_PROXY} HTTPS_PROXY=${process.env.AI_USE_PROXY}` : '';
+      const useVenv = process.env.AI_USE_VENV === 'true' ? 'source venv/bin/activate &&' : '';
+      exec(`cd ${pyDir} && ${useProxy} ${useVenv} python3 main.py`, { timeout: 300000 }, (err, stdout, stderr) => {
         if (err) console.error('market review error:', err.message);
         else console.log('market review done');
       });
