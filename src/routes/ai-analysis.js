@@ -248,7 +248,9 @@ async function handleAIAnalysisRoutes(req, res) {
   if (req.method === 'GET' && req.url === '/api/ai-analysis/summaries') {
     try {
       const pyResp = await fetch(`${PY_BASE}/api/v1/history?limit=200`);
-      const data = await pyResp.json();
+      const text = await pyResp.text();
+      const data = JSON.parse(text);
+      console.log('summaries:', typeof data, Array.isArray(data) ? 'array' : 'object', 'keys:', Object.keys(data).join(','), 'items.length:', (data.items||[]).length);
       const items = data.items || [];
       const latest = {};
       for (const item of items) {
