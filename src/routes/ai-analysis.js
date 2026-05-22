@@ -137,13 +137,39 @@ async function handleAIAnalysisRoutes(req, res) {
     return true;
   }
 
+  // POST /api/ai-config — 保存 AI 配置
+  if (req.method === 'POST' && req.url === '/api/ai-config') {
+    try {
+      const db = require('../db/db');
+      const { marketNewsEnabled } = parseJson(await readBody(req));
+      if (marketNewsEnabled !== undefined) {
+        await db.setConfig('market_news_enabled', marketNewsEnabled ? 'true' : 'false');
+      }
+      sendJson(res, 200, { success: true });
+    } catch (e) { sendJson(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  // GET /api/ai-config — 读取 AI 配置
+  if (req.method === 'GET' && req.url === '/api/ai-config') {
+    try {
+      const db = require('../db/db');
+      const val = await db.getConfig('market_news_enabled');
+      sendJson(res, 200, { marketNewsEnabled: val !== 'false' });
+    } catch (e) { sendJson(res, 500, { error: e.message }); }
+    return true;
+  }
+
   // POST /api/ai-analysis/market-review — 触发大盘复盘
   if (req.method === 'POST' && req.url === '/api/ai-analysis/market-review') {
     try {
       const { exec } = require('child_process');
+      const db = require('../db/db');
+      const newsEnabled = await db.getConfig('market_news_enabled');
       const useProxy = process.env.AI_USE_PROXY ? `HTTP_PROXY=${process.env.AI_USE_PROXY} HTTPS_PROXY=${process.env.AI_USE_PROXY}` : '';
       const useVenv = process.env.AI_USE_VENV === 'true' ? 'source venv/bin/activate &&' : '';
-      exec(`cd ${pyDir} && ${useProxy} ${useVenv} python3 main.py`, { timeout: 300000 }, (err, stdout, stderr) => {
+      const noSearch = (newsEnabled === 'false') ? 'SEARCH_ENABLED=false' : '';
+      exec(`cd ${pyDir} && ${useProxy} ${useVenv} ${noSearch} python3 main.py`, { timeout: 300000 }, (err, stdout, stderr) => {
         if (err) console.error('market review error:', err.message);
         else console.log('market review done');
       });
