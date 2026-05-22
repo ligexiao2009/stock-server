@@ -150,6 +150,38 @@ async function handleAIAnalysisRoutes(req, res) {
     return true;
   }
 
+  // POST /api/ai-chat — Agent 对话
+  if (req.method === 'POST' && req.url === '/api/ai-chat') {
+    try {
+      const body = await readBody(req);
+      const { message, sessionId } = parseJson(body);
+      if (!message) { sendJson(res, 400, { error: '缺少 message' }); return true; }
+
+      const pyResp = await fetch(`${PY_BASE}/api/v1/agent/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, session_id: sessionId || null }),
+      });
+      const data = await pyResp.json();
+      sendJson(res, pyResp.status, data);
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  // GET /api/ai-chat/sessions — 获取历史会话列表
+  if (req.method === 'GET' && req.url === '/api/ai-chat/sessions') {
+    try {
+      const pyResp = await fetch(`${PY_BASE}/api/v1/agent/chat/sessions`);
+      const data = await pyResp.json();
+      sendJson(res, pyResp.status, data);
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
   return false;
 }
 
