@@ -148,6 +148,7 @@ CREATE TABLE IF NOT EXISTS asset_records (
     wechat      DECIMAL(15, 2) DEFAULT 0,
     ths         DECIMAL(15, 2) DEFAULT 0,
     crypto      DECIMAL(15, 2) DEFAULT 0,
+    cash        DECIMAL(15, 2) DEFAULT 0,
     cmb         DECIMAL(15, 2) DEFAULT 0,
     provident   DECIMAL(15, 2) DEFAULT 0,
     receivable  DECIMAL(15, 2) DEFAULT 0,
