@@ -140,7 +140,7 @@ async function handleAIAnalysisRoutes(req, res) {
     try {
       const { exec } = require('child_process');
       const pyDir = '/Users/yangyang/git/daily_stock_analysis';
-      exec(`cd ${pyDir} && source venv/bin/activate && HTTP_PROXY=http://127.0.0.1:7897 HTTPS_PROXY=http://127.0.0.1:7897 python3 main.py --market-review`, { timeout: 300000 }, (err, stdout, stderr) => {
+      exec(`cd ${pyDir} && source venv/bin/activate && HTTP_PROXY=http://127.0.0.1:7897 HTTPS_PROXY=http://127.0.0.1:7897 python3 main.py`, { timeout: 300000 }, (err, stdout, stderr) => {
         if (err) console.error('market review error:', err.message);
         else console.log('market review done');
       });
