@@ -253,10 +253,11 @@ async function handleAIAnalysisRoutes(req, res) {
       try {
         const data = JSON.parse(text);
         items = data.items || [];
-      } catch(e) { console.log('summaries parse error:', e.message, text.slice(0,100)); }
+      } catch(e) { return sendJson(res, 200, { error: 'parse', detail: text.slice(0,100) }); }
       const latest = {};
       for (const item of items) {
-        if (!latest[item.stock_code]) latest[item.stock_code] = item;
+        const code = item.stock_code || item.stockCode;
+        if (code && !latest[code]) latest[code] = item;
       }
       sendJson(res, 200, { summaries: Object.values(latest) });
     } catch (e) { sendJson(res, 500, { error: e.message }); }
