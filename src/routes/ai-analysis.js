@@ -244,6 +244,47 @@ async function handleAIAnalysisRoutes(req, res) {
     return true;
   }
 
+  // GET /api/ai-analysis/summaries — 所有股票最新分析摘要
+  if (req.method === 'GET' && req.url === '/api/ai-analysis/summaries') {
+    try {
+      const pyResp = await fetch(`${PY_BASE}/api/v1/history?limit=200`);
+      const data = await pyResp.json();
+      const items = data.items || [];
+      const latest = {};
+      for (const item of items) {
+        if (!latest[item.stock_code]) latest[item.stock_code] = item;
+      }
+      sendJson(res, 200, { summaries: Object.values(latest) });
+    } catch (e) { sendJson(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  // GET /api/ai-analysis/backtest/:code — 单股回测
+  if (req.method === 'GET' && req.url.startsWith('/api/ai-analysis/backtest/')) {
+    try {
+      const code = req.url.split('/api/ai-analysis/backtest/')[1];
+      const pyResp = await fetch(`${PY_BASE}/api/v1/backtest/performance/${code}`);
+      const data = await pyResp.json();
+      sendJson(res, 200, data);
+    } catch (e) { sendJson(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  // POST /api/ai-analysis/batch — 批量分析
+  if (req.method === 'POST' && req.url === '/api/ai-analysis/batch') {
+    try {
+      const { codes } = parseJson(await readBody(req));
+      if (!codes || !codes.length) { sendJson(res, 400, { error: '缺少 codes' }); return true; }
+      const { exec } = require('child_process');
+      const codeList = codes.join(',');
+      exec(`cd ${pyDir} && STOCK_LIST=${codeList} python3 main.py --no-market-review`, { timeout: 600000 },
+        (err) => { if (err) console.error('batch analysis error:', err.message); else console.log('batch analysis done'); }
+      );
+      sendJson(res, 200, { started: true, count: codes.length, message: `已触发 ${codes.length} 只股票分析` });
+    } catch (e) { sendJson(res, 500, { error: e.message }); }
+    return true;
+  }
+
   return false;
 }
 
