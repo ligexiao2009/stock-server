@@ -106,6 +106,7 @@ async function handleAIAnalysisRoutes(req, res) {
           risk_factors: JSON.stringify(trend.risk_factors || []),
           boards: JSON.stringify(boards.map(b => ({ name: b.name, code: b.code }))),
           dashboard: JSON.stringify(rawResult.dashboard || {}),
+          model_used: latest.model_used || rawResult.model_used || detail.meta?.model_used || '',
         }});
       }
     } catch (e) {
