@@ -21,6 +21,8 @@ function parseJson(str) {
 }
 
 async function handleAIAnalysisRoutes(req, res) {
+  const pyDir = process.env.AI_ANALYSIS_DIR || '/Users/yangyang/git/daily_stock_analysis';
+
   // POST /api/ai-analysis/analyze — 触发分析
   if (req.method === 'POST' && req.url === '/api/ai-analysis/analyze') {
     try {
@@ -120,7 +122,7 @@ async function handleAIAnalysisRoutes(req, res) {
     try {
       const fs = require('fs');
       const path = require('path');
-      const reportsDir = process.env.AI_REPORTS_DIR || '/Users/yangyang/git/daily_stock_analysis/reports';
+      const reportsDir = process.env.AI_REPORTS_DIR || `${pyDir}/reports`;
       const files = fs.readdirSync(reportsDir).filter(f => f.startsWith('market_review_')).sort().reverse();
       if (files.length === 0) {
         sendJson(res, 200, { found: false, message: '暂无大盘复盘' });
@@ -139,8 +141,7 @@ async function handleAIAnalysisRoutes(req, res) {
   if (req.method === 'POST' && req.url === '/api/ai-analysis/market-review') {
     try {
       const { exec } = require('child_process');
-      const pyDir = '/Users/yangyang/git/daily_stock_analysis';
-      exec(`cd ${pyDir} && source venv/bin/activate && HTTP_PROXY=http://127.0.0.1:7897 HTTPS_PROXY=http://127.0.0.1:7897 python3 main.py`, { timeout: 300000 }, (err, stdout, stderr) => {
+      exec(`cd ${pyDir} && python3 main.py`, { timeout: 300000 }, (err, stdout, stderr) => {
         if (err) console.error('market review error:', err.message);
         else console.log('market review done');
       });
