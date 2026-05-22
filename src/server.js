@@ -67,16 +67,18 @@ async function setupCronJob() {
   const cronTime = process.env.ALERT_TIME || configs.alertTime || '0 22 * * *';
 
   // 清理旧任务
-  ['cronJob', 'profitCronJob', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob']
-    .forEach(k => { if (global[k]) global[k].stop(); });
+  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob']
+    .forEach(k => { if (global[k]) { if (Array.isArray(global[k])) global[k].forEach(j => j.stop()); else global[k].stop(); } });
 
   // 基金提醒
   global.cronJob = cron.schedule(cronTime, () => checkFundsAndAlert(),
     { timezone: 'Asia/Shanghai' });
 
   // 每日收益（周一到周五 23:00）
-  global.profitCronJob = cron.schedule('0 0 23 * * 1-5', () => calculateAndSaveDailyProfit(),
-    { timezone: 'Asia/Shanghai' });
+  // 每天 20:00/21:00/22:00/23:00 各执行一次，净值更新后尽快记录
+  global.profitCronJobs = ['0 0 20 * * 1-5', '0 0 21 * * 1-5', '0 0 22 * * 1-5', '0 0 23 * * 1-5'].map(t =>
+    cron.schedule(t, () => calculateAndSaveDailyProfit(), { timezone: 'Asia/Shanghai' })
+  );
 
   // 自动确认交易（每天 09:00）
   global.confirmCronJob = cron.schedule('0 3 0 * * *', () =>
@@ -99,7 +101,7 @@ async function setupCronJob() {
     db.resetAlertRulesDaily();
   }, { timezone: 'Asia/Shanghai' });
 
-  console.log(`定时任务已设置: 基金提醒 ${cronTime}, 收益计算 23:00(工作日), 自动确认 09:00, 涨跌提醒 交易时间`);
+  console.log(`定时任务已设置: 基金提醒 ${cronTime}, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 涨跌提醒 交易时间`);
 }
 
 // ==================== 启动服务器 ====================
