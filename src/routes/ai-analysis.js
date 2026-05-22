@@ -158,7 +158,6 @@ async function handleAIAnalysisRoutes(req, res) {
       const { message, sessionId } = parseJson(body);
       if (!message) { sendJson(res, 400, { error: '缺少 message' }); return true; }
 
-      // 转发到 Python SSE 流
       const pyResp = await fetch(`${PY_BASE}/api/v1/agent/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,12 +170,22 @@ async function handleAIAnalysisRoutes(req, res) {
         'Connection': 'keep-alive',
       });
 
-      const reader = pyResp.body;
-      reader.on('data', chunk => res.write(chunk));
-      reader.on('end', () => res.end());
-      reader.on('error', () => res.end());
+      if (pyResp.body && typeof pyResp.body.pipe === 'function') {
+        pyResp.body.pipe(res);
+      } else {
+        const reader = pyResp.body.getReader();
+        const pump = async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) { res.end(); break; }
+            res.write(value);
+          }
+        };
+        pump().catch(() => res.end());
+      }
     } catch (e) {
-      sendJson(res, 500, { error: e.message });
+      if (!res.headersSent) sendJson(res, 500, { error: e.message });
+      else res.end();
     }
     return true;
   }
