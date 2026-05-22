@@ -45,9 +45,9 @@ async function handleAssetRoutes(req, res, { userId, sendCachedJson, invalidateC
     try {
       const record = await readJsonBody(req);
       const id = await db.createAssetRecord({
-        recordedAt: beijingTime(),
+        recordedAt: beijingTime(), userId,
         total: record.total, alipay: record.alipay, wechat: record.wechat,
-        ths: record.ths, crypto: record.crypto, cmb: record.cmb,
+        ths: record.ths, crypto: record.crypto, cash: record.cash, cmb: record.cmb,
         provident: record.provident, receivable: record.receivable, debt: record.debt,
       });
       invalidateCache('assets');

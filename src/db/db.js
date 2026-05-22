@@ -540,13 +540,13 @@ async function getAssetRecords(userId = null) {
 }
 
 async function createAssetRecord(record) {
-  const { recordedAt, total, alipay, wechat, ths, crypto, cmb, provident, receivable, debt } = record;
+  const { recordedAt, total, alipay, wechat, ths, crypto, cash, cmb, provident, receivable, debt } = record;
   const userId = record.user_id || record.userId || 'default';
   const res = await query(
-    `INSERT INTO asset_records (recorded_at, total, alipay, wechat, ths, crypto, cmb, provident, receivable, debt, user_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `INSERT INTO asset_records (recorded_at, total, alipay, wechat, ths, crypto, cash, cmb, provident, receivable, debt, user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING id`,
-    [recordedAt, total, alipay || 0, wechat || 0, ths || 0, crypto || 0, cmb || 0, provident || 0, receivable || 0, debt || 0, userId]
+    [recordedAt, total, alipay || 0, wechat || 0, ths || 0, crypto || 0, cash || 0, cmb || 0, provident || 0, receivable || 0, debt || 0, userId]
   );
   return res.rows[0].id;
 }
