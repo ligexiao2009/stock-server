@@ -30,6 +30,7 @@ const { handleAssetRoutes } = require('./routes/assets');
 const { handleFundRoutes } = require('./routes/fund');
 const { handleMarketRoutes } = require('./routes/market');
 const { handleConfigRoutes } = require('./routes/config');
+const { handleAIAnalysisRoutes } = require('./routes/ai-analysis');
 const { handleDailyProfitRoutes } = require('./routes/daily-profit');
 const { handleAlertRulesRoutes, checkPriceAlerts } = require('./routes/alert-rules');
 const { handleFundScreenshotRoutes, loadCodeFixMap } = require('./routes/fund-screenshot');
@@ -135,7 +136,7 @@ const server = http.createServer(async (req, res) => {
   if (await handleAuthRoutes(req, res)) return;
 
   // 鉴权
-  const isPublic = !req.url.startsWith('/api/') || req.url === '/api/config' || req.url.startsWith('/api/trigger-') || req.url.startsWith('/api/indices');
+  const isPublic = !req.url.startsWith('/api/') || req.url === '/api/config' || req.url.startsWith('/api/trigger-') || req.url.startsWith('/api/indices') || req.url.startsWith('/api/ai-analysis');
   const auth = isPublic ? { uid: 'default' } : authRequired(req, res);
   if (!auth) return;
   const userId = auth.uid || 'default';
@@ -150,6 +151,7 @@ const server = http.createServer(async (req, res) => {
   if (await handleAssetRoutes(req, res, { userId, sendCachedJson, invalidateCache })) return;
   if (await handleDailyProfitRoutes(req, res, userId)) return;
   if (await handleAlertRulesRoutes(req, res, ctx)) return;
+  if (await handleAIAnalysisRoutes(req, res)) return;
   if (await handleFundRoutes(req, res, { userId, sendCachedJson, invalidateCache, invalidateCacheByPrefix })) return;
   if (await handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CACHE_TTL_MS, KLINE_CACHE_TTL_MS })) return;
   if (await handleFundScreenshotRoutes(req, res, { fetchQuotesBatch })) return;

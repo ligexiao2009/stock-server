@@ -32,7 +32,8 @@ async function autoConfirmPendingTrades(invalidateCache, invalidateCacheByPrefix
     const tradeDateStr = tradeDateBeijing.toISOString().slice(0, 10);
 
     let shouldConfirm = false;
-    if (tradeDateStr === yesterdayStr && trade.isBefore15) shouldConfirm = true;
+    const isBefore15 = trade.isBefore15 ?? trade.isBefore_15 ?? trade.is_before_15 ?? true;
+    if (tradeDateStr === yesterdayStr && isBefore15) shouldConfirm = true;
     else if (tradeDateStr < yesterdayStr) shouldConfirm = true;
 
     if (!shouldConfirm) continue;
