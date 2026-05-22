@@ -249,9 +249,11 @@ async function handleAIAnalysisRoutes(req, res) {
     try {
       const pyResp = await fetch(`${PY_BASE}/api/v1/history?limit=200`);
       const text = await pyResp.text();
-      const data = JSON.parse(text);
-      console.log('summaries:', typeof data, Array.isArray(data) ? 'array' : 'object', 'keys:', Object.keys(data).join(','), 'items.length:', (data.items||[]).length);
-      const items = data.items || [];
+      let items = [];
+      try {
+        const data = JSON.parse(text);
+        items = data.items || [];
+      } catch(e) { console.log('summaries parse error:', e.message, text.slice(0,100)); }
       const latest = {};
       for (const item of items) {
         if (!latest[item.stock_code]) latest[item.stock_code] = item;
