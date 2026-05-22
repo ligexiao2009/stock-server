@@ -182,6 +182,19 @@ async function handleAIAnalysisRoutes(req, res) {
     return true;
   }
 
+  // GET /api/ai-chat/sessions/:id — 获取会话消息
+  if (req.method === 'GET' && req.url.startsWith('/api/ai-chat/sessions/')) {
+    try {
+      const sessionId = req.url.split('/api/ai-chat/sessions/')[1];
+      const pyResp = await fetch(`${PY_BASE}/api/v1/agent/chat/sessions/${sessionId}`);
+      const data = await pyResp.json();
+      sendJson(res, pyResp.status, data);
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
   return false;
 }
 
