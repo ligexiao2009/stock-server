@@ -244,6 +244,21 @@ async function handleAIAnalysisRoutes(req, res) {
     return true;
   }
 
+  // GET /api/ai-analysis/progress — 分析进度
+  if (req.method === 'GET' && req.url === '/api/ai-analysis/progress') {
+    try {
+      const fs = require('fs');
+      const progressFile = '/tmp/ai_progress.json';
+      if (fs.existsSync(progressFile)) {
+        const data = JSON.parse(fs.readFileSync(progressFile, 'utf8'));
+        sendJson(res, 200, { progress: data });
+      } else {
+        sendJson(res, 200, { progress: {} });
+      }
+    } catch (e) { sendJson(res, 200, { progress: {} }); }
+    return true;
+  }
+
   // GET /api/ai-analysis/summaries — 所有股票最新分析摘要
   if (req.method === 'GET' && req.url === '/api/ai-analysis/summaries') {
     try {
