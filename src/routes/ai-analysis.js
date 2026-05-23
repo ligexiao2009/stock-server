@@ -284,7 +284,9 @@ async function handleAIAnalysisRoutes(req, res) {
       if (!codes || !codes.length) { sendJson(res, 400, { error: '缺少 codes' }); return true; }
       const { exec } = require('child_process');
       const codeList = codes.join(',');
-      exec(`cd ${pyDir} && STOCK_LIST=${codeList} python3 main.py --no-market-review`, { timeout: 600000 },
+      const useProxy = process.env.AI_USE_PROXY ? `HTTP_PROXY=${process.env.AI_USE_PROXY} HTTPS_PROXY=${process.env.AI_USE_PROXY}` : '';
+      const useVenv = process.env.AI_USE_VENV === 'true' ? 'source venv/bin/activate &&' : '';
+      exec(`cd ${pyDir} && ${useProxy} ${useVenv} STOCK_LIST=${codeList} python3 main.py --no-market-review`, { timeout: 600000 },
         (err) => { if (err) console.error('batch analysis error:', err.message); else console.log('batch analysis done'); }
       );
       sendJson(res, 200, { started: true, count: codes.length, message: `已触发 ${codes.length} 只股票分析` });
