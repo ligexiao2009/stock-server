@@ -247,13 +247,15 @@ async function handleAIAnalysisRoutes(req, res) {
   // GET /api/ai-analysis/summaries — 所有股票最新分析摘要
   if (req.method === 'GET' && req.url === '/api/ai-analysis/summaries') {
     try {
-      const pyResp = await fetch(`${PY_BASE}/api/v1/history?limit=200`);
+      const pyResp = await fetch(`${PY_BASE}/api/v1/history?limit=100`);
       const text = await pyResp.text();
+      console.log('summaries raw:', text.slice(0,200));
       let items = [];
       try {
         const data = JSON.parse(text);
         items = data.items || [];
-      } catch(e) { return sendJson(res, 200, { error: 'parse', detail: text.slice(0,100) }); }
+        console.log('summaries parsed items:', items.length);
+      } catch(e) { console.log('summaries parse error:', e.message); }
       const latest = {};
       for (const item of items) {
         const code = item.stock_code || item.stockCode;
