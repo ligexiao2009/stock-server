@@ -169,7 +169,7 @@ async function handleAIAnalysisRoutes(req, res) {
       const useProxy = process.env.AI_USE_PROXY ? `HTTP_PROXY=${process.env.AI_USE_PROXY} HTTPS_PROXY=${process.env.AI_USE_PROXY}` : '';
       const useVenv = process.env.AI_USE_VENV === 'true' ? 'source venv/bin/activate &&' : '';
       const noSearch = (newsEnabled === 'false') ? 'SEARCH_ENABLED=false' : '';
-      exec(`cd ${pyDir} && ${useProxy} ${useVenv} ${noSearch} python3 main.py`, { timeout: 300000 }, (err, stdout, stderr) => {
+      exec(`cd ${pyDir} && ${useProxy} ${useVenv} ${noSearch} python3 main.py --force-run`, { timeout: 300000 }, (err, stdout, stderr) => {
         if (err) console.error('market review error:', err.message);
         else console.log('market review done');
       });
@@ -286,7 +286,7 @@ async function handleAIAnalysisRoutes(req, res) {
       const codeList = codes.join(',');
       const useProxy = process.env.AI_USE_PROXY ? `HTTP_PROXY=${process.env.AI_USE_PROXY} HTTPS_PROXY=${process.env.AI_USE_PROXY}` : '';
       const useVenv = process.env.AI_USE_VENV === 'true' ? 'source venv/bin/activate &&' : '';
-      exec(`cd ${pyDir} && ${useProxy} ${useVenv} STOCK_LIST=${codeList} python3 main.py --no-market-review`, { timeout: 600000 },
+      exec(`cd ${pyDir} && ${useProxy} ${useVenv} STOCK_LIST=${codeList} python3 main.py --no-market-review --force-run`, { timeout: 600000 },
         (err) => { if (err) console.error('batch analysis error:', err.message); else console.log('batch analysis done'); }
       );
       sendJson(res, 200, { started: true, count: codes.length, message: `已触发 ${codes.length} 只股票分析` });
