@@ -8,8 +8,32 @@ CREATE TABLE IF NOT EXISTS users (
     id          VARCHAR(50) PRIMARY KEY,
     email       VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(200) NOT NULL,
+    salt        VARCHAR(100),
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ==================== 用户密钥表（加密笔记用） ====================
+CREATE TABLE IF NOT EXISTS user_keys (
+    user_id      VARCHAR(50) PRIMARY KEY,
+    encrypted_key TEXT NOT NULL,
+    iv           TEXT NOT NULL,
+    tag          TEXT NOT NULL,
+    updated_at   TIMESTAMP DEFAULT NOW()
+);
+
+-- ==================== 加密笔记表 ====================
+CREATE TABLE IF NOT EXISTS notes (
+    id          UUID PRIMARY KEY,
+    user_id     VARCHAR(50) NOT NULL,
+    title       TEXT NOT NULL,
+    ciphertext  TEXT NOT NULL,
+    iv          TEXT NOT NULL,
+    tag         TEXT NOT NULL,
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at);
 
 -- ==================== 配置表 ====================
 CREATE TABLE IF NOT EXISTS configs (

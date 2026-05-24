@@ -94,9 +94,10 @@ async function handleAuthRoutes(req, res) {
 
       const hash = await bcrypt.hash(password, 10);
       const uid = crypto.randomBytes(12).toString('hex');
-      await db.query('INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3)', [uid, email, hash]);
+      const salt = crypto.randomBytes(16).toString('hex');
+      await db.query('INSERT INTO users (id, email, password_hash, salt) VALUES ($1, $2, $3, $4)', [uid, email, hash, salt]);
       const token = jwt.sign({ uid, email }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
-      sendJson(res, 200, { token, uid, email });
+      sendJson(res, 200, { token, uid, email, salt });
     } catch (e) {
       if (e.code === '23505') {
         sendJson(res, 409, { error: '该邮箱已注册' });
@@ -123,6 +124,21 @@ async function handleAuthRoutes(req, res) {
     return true;
   }
 
+  // GET /api/auth/salt?email=xxx — 获取盐值（密文笔记密钥派生用）
+  if (req.method === 'GET' && req.url.startsWith('/api/auth/salt')) {
+    try {
+      const url = new URL(req.url, 'http://localhost');
+      const email = url.searchParams.get('email');
+      if (!email) { sendJson(res, 400, { error: '缺少邮箱' }); return true; }
+      const result = await db.query('SELECT salt FROM users WHERE email = $1', [email]);
+      if (result.rows.length === 0) { sendJson(res, 404, { error: '用户不存在' }); return true; }
+      sendJson(res, 200, { salt: result.rows[0].salt || '' });
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
   // POST /api/login
   if (req.method === 'POST' && req.url === '/api/login') {
     try {
@@ -139,7 +155,7 @@ async function handleAuthRoutes(req, res) {
         return true;
       }
       const token = jwt.sign({ uid: user.id, email: user.email }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
-      sendJson(res, 200, { token, uid: user.id, email: user.email });
+      sendJson(res, 200, { token, uid: user.id, email: user.email, salt: user.salt || '' });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }
