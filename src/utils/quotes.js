@@ -67,8 +67,19 @@ async function fetchQuotesBatch(items) {
 
   const quotes = {};
 
-  for (let i = 0; i < normalizedItems.length; i += QUOTES_BATCH_SIZE) {
-    const batch = normalizedItems.slice(i, i + QUOTES_BATCH_SIZE);
+  // TickFlow 优先获取港股（有 timestamp 可判断休市）
+  const hkCodes = normalizedItems
+    .filter(item => !item.isFund && item.code.length === 5)
+    .map(item => item.code);
+  if (hkCodes.length > 0) {
+    const tfQuotes = await fetchHKQuotesViaTickFlow(hkCodes);
+    Object.assign(quotes, tfQuotes);
+  }
+
+  // 剩余走腾讯行情
+  const remaining = normalizedItems.filter(item => !quotes[item.key]);
+  for (let i = 0; i < remaining.length; i += QUOTES_BATCH_SIZE) {
+    const batch = remaining.slice(i, i + QUOTES_BATCH_SIZE);
     if (!batch.length) continue;
 
     const query = batch.map(item => `s_${item.symbol}`).join(',');
@@ -98,6 +109,41 @@ async function fetchQuotesBatch(items) {
   return quotes;
 }
 
+/** TickFlow 获取港股实时行情（带时间戳，可判断休市） */
+async function fetchHKQuotesViaTickFlow(codes) {
+  const TICKFLOW_KEY = process.env.TICKFLOW_API_KEY || '';
+  if (!TICKFLOW_KEY || !codes.length) return {};
+
+  try {
+    const symbols = codes.map(c => `${c}.HK`).join(',');
+    const resp = await fetch(`https://api.tickflow.org/v1/quotes?symbols=${symbols}`, {
+      headers: { 'X-API-Key': TICKFLOW_KEY }
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const body = await resp.json();
+    const data = body.data || [];
+
+    const result = {};
+    for (const item of quotes) {
+      const symbol = item.symbol || '';
+      const code = symbol.replace('.HK', '');
+      const ts = item.timestamp ? new Date(item.timestamp) : new Date();
+      const dateStr = ts.toISOString().slice(0, 10).replace(/-/g, '');
+      result[`${code}:0`] = {
+        code, isFund: false,
+        name: (item.ext?.name || '').replace('[HK] ', ''),
+        price: item.last_price || 0,
+        change: (item.ext?.change_pct || 0),
+        priceDate: dateStr,
+      };
+    }
+    return result;
+  } catch (e) {
+    // 静默降级
+    return {};
+  }
+}
+
 /** 获取单只股票价格 */
 async function fetchStockPrice(code) {
   const quotes = await fetchQuotesBatch([{ code, isFund: false }]);
@@ -120,6 +166,7 @@ module.exports = {
   parseQuoteResponse,
   decodeQtResponse,
   fetchQuotesBatch,
+  fetchHKQuotesViaTickFlow,
   fetchStockPrice,
   fetchFundNetValue,
   QUOTES_BATCH_SIZE,
