@@ -4,6 +4,27 @@
 const db = require('../db/db');
 const { fetchStockPrice, fetchFundNetValue } = require('../utils/quotes');
 
+async function checkMarketOpen() {
+  try {
+    const headers = { 'Referer': 'https://finance.sina.com.cn' };
+    const [shRes, hkRes] = await Promise.all([
+      fetch('http://hq.sinajs.cn/list=sh000001', { headers }),
+      fetch('http://hq.sinajs.cn/list=hkHSI', { headers }),
+    ]);
+    const [shText, hkText] = await Promise.all([shRes.text(), hkRes.text()]);
+    const getDate = (text) => {
+      const parts = text.split(',');
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const v = parts[i].replace(/"/g, '').trim();
+        if (/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(v)) return v.replace(/-/g, '').replace(/\//g, '');
+      }
+      return '';
+    };
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    return { aStockOpen: getDate(shText) === today, hkStockOpen: getDate(hkText) === today };
+  } catch { return { aStockOpen: true, hkStockOpen: true }; }
+}
+
 async function calculateAndSaveDailyProfit() {
   console.log('\n========== 开始计算每日收益 ==========');
   const allRows = await db.getPositions();
@@ -39,8 +60,13 @@ async function calculateAndSaveDailyProfit() {
 
     const hkdRate = parseFloat(await db.getConfig('hkd_cny_rate')) || 0.92;
     const usdRate = parseFloat(await db.getConfig('crypto_fx')) || 7.2;
+    const marketStatus = await checkMarketOpen();
 
     for (const stock of stocks) {
+      // 休市跳过：港股5位代码 + HK休市 / A股6位 + A休市
+      if (stock.code.length === 5 && !marketStatus.hkStockOpen) continue;
+      if (stock.code.length === 6 && !marketStatus.aStockOpen) continue;
+
       const stockData = await fetchStockPrice(stock.code);
       if (stockData && stockData.price > 0 && stock.shares > 0) {
         let price = stockData.price;
