@@ -27,12 +27,7 @@ if (process.env.DATABASE_URL) {
   };
 }
 
-const pool = new Pool(poolConfig);
-
-// 所有连接设为北京时间
-pool.on('connect', async (client) => {
-  await client.query("SET timezone = 'Asia/Shanghai'");
-});
+const pool = new Pool({ ...poolConfig, options: '-c timezone=Asia/Shanghai' });
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
