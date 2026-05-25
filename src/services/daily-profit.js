@@ -5,13 +5,16 @@ const db = require('../db/db');
 const { fetchStockPrice, fetchFundNetValue } = require('../utils/quotes');
 
 async function checkMarketOpen() {
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
     const headers = { 'Referer': 'https://finance.sina.com.cn' };
-    const [shRes, hkRes] = await Promise.all([
-      fetch('http://hq.sinajs.cn/list=sh000001', { headers }),
-      fetch('http://hq.sinajs.cn/list=hkHSI', { headers }),
+    const [shText, hkText] = await Promise.all([
+      fetch('http://hq.sinajs.cn/list=sh000001', { headers, signal: ctrl.signal }).then(r => r.text()),
+      fetch('http://hq.sinajs.cn/list=hkHSI', { headers, signal: ctrl.signal }).then(r => r.text()),
     ]);
-    const [shText, hkText] = await Promise.all([shRes.text(), hkRes.text()]);
+    clearTimeout(t);
     const getDate = (text) => {
       const parts = text.split(',');
       for (let i = parts.length - 1; i >= 0; i--) {
@@ -20,9 +23,16 @@ async function checkMarketOpen() {
       }
       return '';
     };
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    return { aStockOpen: getDate(shText) === today, hkStockOpen: getDate(hkText) === today };
-  } catch { return { aStockOpen: true, hkStockOpen: true }; }
+    const aOpen = getDate(shText) === today;
+    const hkOpen = getDate(hkText) === today;
+    console.log(`市场状态: A股${aOpen ? '开' : '休'} 港股${hkOpen ? '开' : '休'} (sh=${getDate(shText)} hk=${getDate(hkText)})`);
+    return { aStockOpen: aOpen, hkStockOpen: hkOpen };
+  } catch (e) {
+    const day = new Date().getDay();
+    const isWeekday = day >= 1 && day <= 5;
+    console.log(`市场状态检测失败(${e.message})，按工作日推算: A股${isWeekday ? '开' : '休'} 港股${isWeekday ? '开' : '休'}`);
+    return { aStockOpen: isWeekday, hkStockOpen: isWeekday };
+  }
 }
 
 async function calculateAndSaveDailyProfit() {

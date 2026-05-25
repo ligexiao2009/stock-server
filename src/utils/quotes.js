@@ -149,7 +149,7 @@ async function fetchStockPrice(code) {
   const quotes = await fetchQuotesBatch([{ code, isFund: false }]);
   const data = quotes[`${code}:0`];
   if (!data) return null;
-  return { name: data.name, price: data.price, change: data.change };
+  return { name: data.name, price: data.price, change: data.change, priceDate: data.priceDate };
 }
 
 /** 获取单只基金净值 */
