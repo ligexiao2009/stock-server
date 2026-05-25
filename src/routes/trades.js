@@ -128,6 +128,7 @@ async function handleTradeRoutes(req, res, { userId, sendCachedJson, invalidateC
         amount: formatted.amount, shares: formatted.shares,
         netValue: formatted.netValue, isBefore15: formatted.isBefore15 || true,
         createdAt: formatted.createdAt, localDate: formatted.localDate || null,
+        user_id: userId,
       });
 
       invalidateCache('trade-history', `trade-history:${rowId}`);
@@ -145,7 +146,7 @@ async function handleTradeRoutes(req, res, { userId, sendCachedJson, invalidateC
       const { history } = await readJsonBody(req);
 
       await db.query('BEGIN');
-      await db.query('DELETE FROM trade_history');
+      await db.query('DELETE FROM trade_history WHERE user_id = $1', [userId]);
 
       for (const [rowId, records] of Object.entries(history)) {
         for (const record of records) {
@@ -158,6 +159,7 @@ async function handleTradeRoutes(req, res, { userId, sendCachedJson, invalidateC
             amount: formatted.amount, shares: formatted.shares,
             netValue: formatted.netValue, isBefore15: formatted.isBefore15 || true,
             createdAt: formatted.createdAt, localDate: formatted.localDate || null,
+            user_id: userId,
           });
         }
       }

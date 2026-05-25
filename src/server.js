@@ -139,7 +139,7 @@ const server = http.createServer(async (req, res) => {
   if (await handleAuthRoutes(req, res)) return;
 
   // 鉴权
-  const isPublic = !req.url.startsWith('/api/') || req.url === '/api/config' || req.url.startsWith('/api/trigger-') || req.url.startsWith('/api/indices') || req.url.startsWith('/api/ai-analysis') || req.url.startsWith('/api/ai-chat');
+  const isPublic = !req.url.startsWith('/api/') || req.url === '/api/config' || req.url.startsWith('/api/trigger-') || req.url.startsWith('/api/indices') || req.url.startsWith('/api/ai-analysis') || req.url.startsWith('/api/ai-chat') || req.url === '/api/market-status';
   const auth = isPublic ? { uid: 'default' } : authRequired(req, res);
   if (!auth) return;
   const userId = auth.uid || 'default';

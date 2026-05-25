@@ -87,7 +87,7 @@ async function fetchQuotesBatch(items) {
           name: item.isFund ? (parts[1] ? parts[1].replace('[基金] ', '') : '') : (parts[1] || ''),
           price: parseFloat(parts[3]) || 0,
           change: parseFloat(parts[5]) || 0,
-          priceDate: item.isFund ? parseFundPriceDate(parts) : '',
+          priceDate: parseFundPriceDate(parts),
         };
       });
     } catch (error) {

@@ -59,6 +59,7 @@ async function autoConfirmPendingTrades(invalidateCache, invalidateCacheByPrefix
         amount: parseFloat(redeemAmount.toFixed(2)), shares: reduceShares,
         netValue: parseFloat(fundData.netValue.toFixed(4)),
         isBefore15: trade.isBefore15, createdAt: trade.createdAt, localDate: tradeDateStr,
+        user_id: trade.user_id,
       });
     } else {
       const newShares = trade.amount / fundData.netValue;
@@ -76,6 +77,7 @@ async function autoConfirmPendingTrades(invalidateCache, invalidateCacheByPrefix
         amount: trade.amount, shares: parseFloat(newShares.toFixed(2)),
         netValue: parseFloat(fundData.netValue.toFixed(4)),
         isBefore15: trade.isBefore15, createdAt: trade.createdAt, localDate: tradeDateStr,
+        user_id: trade.user_id,
       });
     }
 

@@ -44,6 +44,43 @@ async function handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CAC
     if (servePublicFile(req, res, req.url)) return true;
   }
 
+  // ========== 市场状态（是否开盘） ==========
+  if (req.method === 'GET' && req.url === '/api/market-status') {
+    try {
+      const urls = [
+        'http://hq.sinajs.cn/list=sh000001',
+        'http://hq.sinajs.cn/list=hkHSI',
+      ];
+      const headers = { 'Referer': 'https://finance.sina.com.cn' };
+      const [shRes, hkRes] = await Promise.all(urls.map(u => fetch(u, { headers })));
+      const [shText, hkText] = await Promise.all([shRes.text(), hkRes.text()]);
+
+      const extractDate = (text) => {
+        const parts = text.split(',');
+        // Sina format: name,...,YYYY-MM-DD,HH:MM:SS,...
+        for (let i = parts.length - 1; i >= 0; i--) {
+          const v = parts[i].replace(/"/g, '').trim();
+          if (/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(v)) return v.replace(/-/g, '').replace(/\//g, '');
+        }
+        return '';
+      };
+
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const shDate = extractDate(shText);
+      const hkDate = extractDate(hkText);
+
+      sendJson(res, 200, {
+        aStockOpen: shDate === today,
+        hkStockOpen: hkDate === today,
+        shDate,
+        hkDate,
+      });
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
   // ========== 指数行情 ==========
   if (req.method === 'GET' && req.url === '/api/indices') {
     try {
