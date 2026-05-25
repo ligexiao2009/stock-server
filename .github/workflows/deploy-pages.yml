@@ -23,4 +23,4 @@ jobs:
             git checkout dev 
             git pull origin dev
             npm install 
-            pm2 restart stock || pm2 start ./start.sh --interpreter bash --name stock
+            pm2 restart stock --time || pm2 start ./start.sh --interpreter bash --name stock --time
