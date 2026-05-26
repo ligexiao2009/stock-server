@@ -1,0 +1,26 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: root
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            export PATH=$PATH:/root/.nvm/versions/node/v22.22.2/bin
+            cd /root/product/finance-app
+            git fetch origin 
+            git checkout dev 
+            git pull origin dev
+            npm install 
+            pm2 restart stock --time || pm2 start ./start.sh --interpreter bash --name stock --time

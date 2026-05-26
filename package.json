@@ -1,0 +1,42 @@
+{
+  "name": "stock-dashboard",
+  "version": "1.0.0",
+  "description": "股票资产看板 - 带后端保存功能",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "build:css": "tailwindcss -i ./styles/tailwind.input.css -o ./public/tailwind.generated.css --minify",
+    "db:init": "node scripts/init-db.js",
+    "db:migrate": "node scripts/migrate-data.js",
+    "db:test": "node scripts/test-db.js",
+    "check:codes": "node scripts/check-codes.js",
+    "fix:codes": "node scripts/fix-codes.js",
+    "debug:alert": "node scripts/debug-alert.js",
+    "check:profit": "node scripts/check-profit.js"
+  },
+  "keywords": [
+    "stock",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.16.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.3.1",
+    "iconv-lite": "^0.7.2",
+    "jsonwebtoken": "^9.0.3",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.7.0",
+    "nodemailer": "^8.0.7",
+    "pg": "^8.20.0",
+    "stock-api": "^2.3.0",
+    "tesseract.js": "^7.0.0",
+    "yahoo-finance2": "^3.14.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17"
+  }
+}
