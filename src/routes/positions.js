@@ -46,7 +46,7 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
       let existingPosition = null;
       if (rowData.id) existingPosition = await db.getPosition(rowData.id);
       if (!existingPosition && rowData.code && rowData.isFund !== undefined) {
-        existingPosition = await db.getPositionByCode(rowData.code, rowData.isFund);
+        existingPosition = await db.getPositionByCode(rowData.code, rowData.isFund, userId);
       }
 
       const isOverseas = rowData.categoryId === 'us_stock';
