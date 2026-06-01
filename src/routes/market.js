@@ -141,6 +141,23 @@ async function handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CAC
     return true;
   }
 
+  // ========== 加密币快照 ==========
+  if (req.method === 'GET' && req.url.startsWith('/api/crypto-snapshots')) {
+    try {
+      const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      const date = requestUrl.searchParams.get('date');
+      if (!date) {
+        sendJson(res, 400, { error: 'date parameter required (YYYYMMDD)' });
+        return true;
+      }
+      const snapshots = await db.getCryptoSnapshots(date, userId);
+      sendJson(res, 200, { snapshots });
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
   // ========== 批量行情 ==========
   if (req.method === 'GET' && req.url.startsWith('/api/quotes')) {
     try {

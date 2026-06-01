@@ -21,6 +21,7 @@ const { calculateAndSaveDailyProfit } = require('./services/daily-profit');
 const { autoConfirmPendingTrades } = require('./services/auto-confirm');
 const { sendWechatMessage, initServerchanKey } = require('./services/wechat');
 const { takeSnapshot } = require('./services/intraday-snapshot');
+const { takeCryptoSnapshot } = require('./services/crypto-snapshot');
 
 // 路由模块
 const { handleAuthRoutes } = require('./routes/auth');
@@ -69,7 +70,7 @@ async function setupCronJob() {
   const cronTime = process.env.ALERT_TIME || configs.alertTime || '0 22 * * *';
 
   // 清理旧任务
-  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'nightSnapshotJob']
+  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'nightSnapshotJob', 'cryptoSnapshotJob']
     .forEach(k => { if (global[k]) { if (Array.isArray(global[k])) global[k].forEach(j => j.stop()); else global[k].stop(); } });
 
   // 基金提醒
@@ -121,7 +122,12 @@ async function setupCronJob() {
     takeSnapshot().catch(e => console.error('晚间快照失败:', e.message));
   }, { timezone: 'Asia/Shanghai' });
 
-  console.log(`定时任务已设置: 基金提醒 ${cronTime}, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每5分钟, 港股收盘 16:10, 晚间 23:30`);
+  // 加密币快照（24/7 每5分钟）
+  global.cryptoSnapshotJob = cron.schedule('*/5 * * * *', () => {
+    takeCryptoSnapshot().catch(e => console.error('加密币快照失败:', e.message));
+  });
+
+  console.log(`定时任务已设置: 基金提醒 ${cronTime}, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每5分钟, 港股收盘 16:10, 晚间 23:30, 加密币 24/7每5分钟`);
 }
 
 // ==================== 启动服务器 ====================
