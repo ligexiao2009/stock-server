@@ -98,7 +98,9 @@ async function calculateAndSaveDailyProfit() {
           const month = parseInt(adjustedPriceDate.substr(4, 2)) - 1;
           const day = parseInt(adjustedPriceDate.substr(6, 2));
           const date = new Date(year, month, day);
-          date.setDate(date.getDate() + 1);
+          const weekday = now.getDay(); // 0=周日 1=周一 ... 6=周六
+          const offset = weekday === 1 ? 3 : 1; // 周一+3跳过周末，其余+1
+          date.setDate(date.getDate() + offset);
           adjustedPriceDate = `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}`;
         }
         let isTodayUpdated = false;
