@@ -47,34 +47,47 @@ async function handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CAC
   // ========== 市场状态（是否开盘） ==========
   if (req.method === 'GET' && req.url === '/api/market-status') {
     try {
-      const urls = [
-        'http://hq.sinajs.cn/list=sh000001',
-        'http://hq.sinajs.cn/list=hkHSI',
-      ];
-      const headers = { 'Referer': 'https://finance.sina.com.cn' };
-      const [shRes, hkRes] = await Promise.all(urls.map(u => fetch(u, { headers })));
-      const [shText, hkText] = await Promise.all([shRes.text(), hkRes.text()]);
+      let shDate = '', hkDate = '';
+      try {
+        const urls = [
+          'http://hq.sinajs.cn/list=sh000001',
+          'http://hq.sinajs.cn/list=hkHSI',
+        ];
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 5000);
+        const headers = { 'Referer': 'https://finance.sina.com.cn' };
+        const [shRes, hkRes] = await Promise.all(urls.map(u => fetch(u, { headers, signal: ctrl.signal })));
+        clearTimeout(t);
+        const [shText, hkText] = await Promise.all([shRes.text(), hkRes.text()]);
 
-      const extractDate = (text) => {
-        const parts = text.split(',');
-        // Sina format: name,...,YYYY-MM-DD,HH:MM:SS,...
-        for (let i = parts.length - 1; i >= 0; i--) {
-          const v = parts[i].replace(/"/g, '').trim();
-          if (/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(v)) return v.replace(/-/g, '').replace(/\//g, '');
-        }
-        return '';
-      };
+        const extractDate = (text) => {
+          const parts = text.split(',');
+          for (let i = parts.length - 1; i >= 0; i--) {
+            const v = parts[i].replace(/"/g, '').trim();
+            if (/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(v)) return v.replace(/-/g, '').replace(/\//g, '');
+          }
+          return '';
+        };
 
-      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const shDate = extractDate(shText);
-      const hkDate = extractDate(hkText);
+        shDate = extractDate(shText);
+        hkDate = extractDate(hkText);
+      } catch (_) {
+        // Sina 不可用，降级到工作日判断
+      }
 
-      sendJson(res, 200, {
-        aStockOpen: shDate === today,
-        hkStockOpen: hkDate === today,
-        shDate,
-        hkDate,
-      });
+      // Fallback: Sina 无数据时按工作日判断
+      if (!shDate || !hkDate) {
+        const wd = new Date().getDay();
+        const isWeekday = wd >= 1 && wd <= 5;
+        if (!shDate) shDate = isWeekday ? 'weekday' : 'weekend';
+        if (!hkDate) hkDate = isWeekday ? 'weekday' : 'weekend';
+        sendJson(res, 200, { aStockOpen: isWeekday, hkStockOpen: isWeekday, shDate, hkDate });
+      } else {
+        // 用本地日期（UTC+8）而非 UTC 日期判断
+        const now = new Date();
+        const localToday = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+        sendJson(res, 200, { aStockOpen: shDate === localToday, hkStockOpen: hkDate === localToday, shDate, hkDate });
+      }
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }
@@ -122,6 +135,38 @@ async function handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CAC
         }
         return { quotes: result };
       }, { ttlMs: 60000 });
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  // ========== 加密币快照 ==========
+  if (req.method === 'GET' && req.url.startsWith('/api/crypto-snapshots')) {
+    try {
+      const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      const date = requestUrl.searchParams.get('date');
+      if (!date) {
+        sendJson(res, 400, { error: 'date parameter required (YYYYMMDD)' });
+        return true;
+      }
+      const snapshots = await db.getCryptoSnapshots(date, userId);
+
+      // Find 00:00 base price for each coin
+      const basePrices = {};
+      for (const s of snapshots) {
+        if (s.time === '00:00' && s.price > 0) {
+          basePrices[s.code] = s.price;
+        }
+      }
+
+      // Calculate percentage change from 00:00 base
+      const result = snapshots.map(s => ({
+        ...s,
+        changePercent: basePrices[s.code] ? Math.round((s.price - basePrices[s.code]) / basePrices[s.code] * 10000) / 100 : 0,
+      }));
+
+      sendJson(res, 200, { snapshots: result });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }

@@ -124,7 +124,7 @@ async function fetchHKQuotesViaTickFlow(codes) {
     const data = body.data || [];
 
     const result = {};
-    for (const item of quotes) {
+    for (const item of data) {
       const symbol = item.symbol || '';
       const code = symbol.replace('.HK', '');
       const ts = item.timestamp ? new Date(item.timestamp) : new Date();
@@ -133,7 +133,7 @@ async function fetchHKQuotesViaTickFlow(codes) {
         code, isFund: false,
         name: (item.ext?.name || '').replace('[HK] ', ''),
         price: item.last_price || 0,
-        change: (item.ext?.change_pct || 0),
+        change: (item.ext?.change_pct || 0) * 100,
         priceDate: dateStr,
       };
     }

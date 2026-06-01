@@ -5,6 +5,7 @@
 const fetch = require('node-fetch');
 
 const { getFundDetail } = require('./fund-detail');
+const { fetchQuotesBatch } = require('./quotes');
 
 function isETF(code) { return code.startsWith('5'); }
 
@@ -190,13 +191,25 @@ async function getStockDetail(code) {
 
   // A股/港股
   const symbol = buildSymbol(code);
-  const [minuteData, klineData, quotes] = await Promise.all([
+  const isHK = code.length === 5;
+  const [minuteData, klineData, quoteResult] = await Promise.all([
     fetchMinuteData(symbol),
     fetchKline(symbol),
-    fetchQuotes([symbol]),
+    isHK
+      ? fetchQuotesBatch([{ code, isFund: false }])
+      : fetchQuotes([symbol]).then(q => q),
   ]);
 
-  const quote = quotes[code] || { code, name: '', price: 0, change: 0, volume: 0, turnover: 0, marketCap: 0, isHK: code.length === 5 };
+  let quote;
+  if (isHK) {
+    const q = quoteResult[code + ':0'] || {};
+    quote = {
+      code, name: q.name || '', price: q.price || 0, change: q.change || 0,
+      volume: 0, turnover: 0, marketCap: 0, isHK: true,
+    };
+  } else {
+    quote = quoteResult[code] || { code, name: '', price: 0, change: 0, volume: 0, turnover: 0, marketCap: 0, isHK: false };
+  }
 
   let topHoldings = null;
   if (isETF(code)) {

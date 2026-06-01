@@ -69,7 +69,7 @@ function snakeToCamel(obj) {
     const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 
     // Convert numeric strings to numbers, EXCEPT for id/code/categoryId fields
-    const isIdField = ['code', 'id', 'categoryId'].includes(camelKey);
+    const isIdField = ['code', 'id', 'categoryId', 'date'].includes(camelKey);
     if (!isIdField && typeof value === 'string' && !isNaN(value) && value !== '') {
       result[camelKey] = parseFloat(value);
     } else {
@@ -171,10 +171,10 @@ async function getPosition(id) {
   return res.rows[0] ? snakeToCamel(res.rows[0]) : null;
 }
 
-async function getPositionByCode(code, isFund) {
+async function getPositionByCode(code, isFund, userId = 'default') {
   const res = await query(
-    'SELECT * FROM positions WHERE code = $1 AND is_fund = $2',
-    [code, isFund]
+    'SELECT * FROM positions WHERE code = $1 AND is_fund = $2 AND user_id = $3',
+    [code, isFund, userId]
   );
   return res.rows[0] ? snakeToCamel(res.rows[0]) : null;
 }
@@ -587,6 +587,46 @@ async function deleteCategory(id) {
   await query('DELETE FROM categories WHERE id = $1', [id]);
 }
 
+// ==================== Intraday Snapshots ====================
+async function saveIntradaySnapshot({ userId, date, time, stockProfit, fundProfit, totalProfit, stockMarket, fundMarket, totalMarket }) {
+  await query(
+    `INSERT INTO intraday_snapshots (user_id, date, time, stock_profit, fund_profit, total_profit, stock_market, fund_market, total_market)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT (date, time, user_id) DO NOTHING`,
+    [userId || 'default', date, time, stockProfit || 0, fundProfit || 0, totalProfit || 0, stockMarket || 0, fundMarket || 0, totalMarket || 0]
+  );
+}
+
+async function getIntradaySnapshots(date, userId = null) {
+  const uid = userId || 'default';
+  const res = await query(
+    'SELECT * FROM intraday_snapshots WHERE date = $1 AND user_id = $2 ORDER BY time ASC',
+    [date, uid]
+  );
+  return res.rows.map(r => snakeToCamel(fixNumericFields(r)));
+}
+
+// ==================== Crypto Snapshots ====================
+async function saveCryptoSnapshot({ userId, date, time, code, name, price, cost, shares, profit }) {
+  await query(
+    `INSERT INTO crypto_snapshots (user_id, date, time, code, name, price, cost, shares, profit)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT (date, time, code, user_id) DO NOTHING`,
+    [userId || 'default', date, time, code, name || '', price || 0, cost || 0, shares || 0, profit || 0]
+  );
+}
+
+async function getCryptoSnapshots(startDate, userId = null) {
+  const uid = userId || 'default';
+  const res = await query(
+    `SELECT * FROM crypto_snapshots
+     WHERE (date || ' ' || time) >= $1 AND user_id = $2
+     ORDER BY (date || ' ' || time) ASC`,
+    [startDate, uid]
+  );
+  return res.rows.map(r => snakeToCamel(fixNumericFields(r)));
+}
+
 module.exports = {
   // Database connection
   pool,
@@ -650,5 +690,13 @@ module.exports = {
   createAssetRecord,
   deleteAssetRecord,
   deleteAllAssetRecords,
+
+  // Intraday snapshots
+  saveIntradaySnapshot,
+  getIntradaySnapshots,
+
+  // Crypto snapshots
+  saveCryptoSnapshot,
+  getCryptoSnapshots,
 
 };
