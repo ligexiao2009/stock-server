@@ -591,7 +591,8 @@ async function deleteCategory(id) {
 async function saveIntradaySnapshot({ userId, date, time, stockProfit, fundProfit, totalProfit, stockMarket, fundMarket, totalMarket }) {
   await query(
     `INSERT INTO intraday_snapshots (user_id, date, time, stock_profit, fund_profit, total_profit, stock_market, fund_market, total_market)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT (date, time, user_id) DO NOTHING`,
     [userId || 'default', date, time, stockProfit || 0, fundProfit || 0, totalProfit || 0, stockMarket || 0, fundMarket || 0, totalMarket || 0]
   );
 }

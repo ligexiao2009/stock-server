@@ -37,7 +37,7 @@ async function takeSnapshot() {
   const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
 
   // 判断是否在交易时间（A股 9:30-15:00，港股 9:30-16:10）
-  const aOpen = (hour > 9 || (hour === 9 && minute >= 30)) && hour < 15;
+  const aOpen = (hour > 9 || (hour === 9 && minute >= 30)) && (hour < 15 || (hour === 15 && minute === 0));
   const hkOpen = (hour > 9 || (hour === 9 && minute >= 30)) && (hour < 16 || (hour === 16 && minute <= 10));
   if (!aOpen && !hkOpen) {
     console.log(`非交易时间 ${timeStr}，跳过快照`);
@@ -68,9 +68,8 @@ async function takeSnapshot() {
     let stockMarket = 0, fundMarket = 0;
 
     for (const stock of stocks) {
-      // 休市跳过
+      // 港股休市跳过（A股收盘后仍用最后价格）
       if (stock.code.length === 5 && !hkOpen) continue;
-      if (stock.code.length === 6 && !aOpen) continue;
 
       const q = quotes[`${stock.code}:0`];
       if (!q || q.price <= 0 || stock.shares <= 0) continue;

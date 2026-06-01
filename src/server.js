@@ -103,15 +103,12 @@ async function setupCronJob() {
     db.resetAlertRulesDaily();
   }, { timezone: 'Asia/Shanghai' });
 
-  // 盘中收益快照（交易时间每5分钟）
-  global.intradaySnapshotJob = cron.schedule('30,35,40,45,50,55 9 * * 1-5,*/5 10-15 * * 1-5', () => {
+  // 盘中收益快照（交易时间每5分钟，覆盖A股+港股，16:15后停止）
+  global.intradaySnapshotJob = cron.schedule('*/5 9-16 * * 1-5', () => {
     const now = new Date();
     const h = now.getHours(), m = now.getMinutes();
-    const inAMorning = h === 9 && m >= 30;
-    const inAAfternoon = h >= 10 && h < 15;
-    if (inAMorning || inAAfternoon) {
-      takeSnapshot().catch(e => console.error('盘中快照失败:', e.message));
-    }
+    if (h > 16 || (h === 16 && m > 15)) return;
+    takeSnapshot().catch(e => console.error('盘中快照失败:', e.message));
   }, { timezone: 'Asia/Shanghai' });
 
   // 港股收盘快照（16:10）
