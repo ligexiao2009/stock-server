@@ -38,7 +38,7 @@ async function takeSnapshot() {
 
   // 判断是否在交易时间（A股 9:30-15:00，港股 9:30-16:10）
   const aOpen = (hour > 9 || (hour === 9 && minute >= 30)) && (hour < 15 || (hour === 15 && minute === 0));
-  const hkOpen = (hour > 9 || (hour === 9 && minute >= 30)) && (hour < 16 || (hour === 16 && minute <= 10));
+  const hkOpen = (hour > 9 || (hour === 9 && minute >= 30)) && (hour < 16 || (hour === 16 && minute <= 15));
   if (!aOpen && !hkOpen) {
     console.log(`非交易时间 ${timeStr}，跳过快照`);
     return;
