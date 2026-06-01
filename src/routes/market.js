@@ -151,7 +151,22 @@ async function handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CAC
         return true;
       }
       const snapshots = await db.getCryptoSnapshots(date, userId);
-      sendJson(res, 200, { snapshots });
+
+      // Find 00:00 base price for each coin
+      const basePrices = {};
+      for (const s of snapshots) {
+        if (s.time === '00:00' && s.price > 0) {
+          basePrices[s.code] = s.price;
+        }
+      }
+
+      // Calculate percentage change from 00:00 base
+      const result = snapshots.map(s => ({
+        ...s,
+        changePercent: basePrices[s.code] ? Math.round((s.price - basePrices[s.code]) / basePrices[s.code] * 10000) / 100 : 0,
+      }));
+
+      sendJson(res, 200, { snapshots: result });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }

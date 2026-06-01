@@ -9,12 +9,33 @@ const CRYPTO_PAIRS = [
   { pair: 'OKB_USDT', code: 'OKB', name: 'OKB' },
 ];
 
-async function fetchGateioPrice(pair) {
-  const url = `https://api.gateio.ws/api/v4/spot/tickers?currency_pair=${pair}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  const ticker = Array.isArray(data) ? data[0] : data;
-  return parseFloat(ticker.last) || 0;
+async function fetchWithRetry(url, retries = 3, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const resp = await fetch(url);
+      const data = await resp.json();
+      return data;
+    } catch (e) {
+      if (i === retries - 1) throw e;
+      await new Promise(r => setTimeout(r, delay * (i + 1)));
+    }
+  }
+}
+
+async function fetchGateioPrices() {
+  const result = {};
+  for (const cp of CRYPTO_PAIRS) {
+    try {
+      const url = `https://api.gateio.ws/api/v4/spot/tickers?currency_pair=${cp.pair}`;
+      const data = await fetchWithRetry(url);
+      if (Array.isArray(data) && data.length > 0) {
+        result[cp.code] = parseFloat(data[0].last) || 0;
+      }
+    } catch (e) {
+      console.error(`获取 ${cp.code} 价格失败:`, e.message);
+    }
+  }
+  return result;
 }
 
 async function takeCryptoSnapshot() {
@@ -37,15 +58,12 @@ async function takeCryptoSnapshot() {
     return;
   }
 
-  // 批量获取价格
-  const prices = {};
-  for (const cp of CRYPTO_PAIRS) {
-    try {
-      prices[cp.code] = await fetchGateioPrice(cp.pair);
-    } catch (e) {
-      console.error(`获取 ${cp.code} 价格失败:`, e.message);
-      prices[cp.code] = 0;
-    }
+  // 一次请求获取所有币价格
+  let prices = {};
+  try {
+    prices = await fetchGateioPrices();
+  } catch (e) {
+    console.error('获取加密币价格失败:', e.message);
   }
 
   // 获取汇率

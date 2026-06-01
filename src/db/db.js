@@ -621,7 +621,7 @@ async function getCryptoSnapshots(startDate, userId = null) {
   const res = await query(
     `SELECT * FROM crypto_snapshots
      WHERE (date || ' ' || time) >= $1 AND user_id = $2
-     ORDER BY date ASC, time ASC`,
+     ORDER BY (date || ' ' || time) ASC`,
     [startDate, uid]
   );
   return res.rows.map(r => snakeToCamel(fixNumericFields(r)));
