@@ -20,6 +20,7 @@ const { checkFundsAndAlert } = require('./services/fund-alert');
 const { calculateAndSaveDailyProfit } = require('./services/daily-profit');
 const { autoConfirmPendingTrades } = require('./services/auto-confirm');
 const { sendWechatMessage, initServerchanKey } = require('./services/wechat');
+const { takeSnapshot } = require('./services/intraday-snapshot');
 
 // 路由模块
 const { handleAuthRoutes } = require('./routes/auth');
@@ -68,7 +69,7 @@ async function setupCronJob() {
   const cronTime = process.env.ALERT_TIME || configs.alertTime || '0 22 * * *';
 
   // 清理旧任务
-  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob']
+  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'nightSnapshotJob']
     .forEach(k => { if (global[k]) { if (Array.isArray(global[k])) global[k].forEach(j => j.stop()); else global[k].stop(); } });
 
   // 基金提醒
@@ -102,7 +103,28 @@ async function setupCronJob() {
     db.resetAlertRulesDaily();
   }, { timezone: 'Asia/Shanghai' });
 
-  console.log(`定时任务已设置: 基金提醒 ${cronTime}, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 涨跌提醒 交易时间`);
+  // 盘中收益快照（交易时间每5分钟）
+  global.intradaySnapshotJob = cron.schedule('30,35,40,45,50,55 9 * * 1-5,*/5 10-15 * * 1-5', () => {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes();
+    const inAMorning = h === 9 && m >= 30;
+    const inAAfternoon = h >= 10 && h < 15;
+    if (inAMorning || inAAfternoon) {
+      takeSnapshot().catch(e => console.error('盘中快照失败:', e.message));
+    }
+  }, { timezone: 'Asia/Shanghai' });
+
+  // 港股收盘快照（16:10）
+  global.hkCloseSnapshotJob = cron.schedule('10 16 * * 1-5', () => {
+    takeSnapshot().catch(e => console.error('港股收盘快照失败:', e.message));
+  }, { timezone: 'Asia/Shanghai' });
+
+  // 晚间最终快照（23:30，等基金净值更新完）
+  global.nightSnapshotJob = cron.schedule('30 23 * * 1-5', () => {
+    takeSnapshot().catch(e => console.error('晚间快照失败:', e.message));
+  }, { timezone: 'Asia/Shanghai' });
+
+  console.log(`定时任务已设置: 基金提醒 ${cronTime}, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每5分钟, 港股收盘 16:10, 晚间 23:30`);
 }
 
 // ==================== 启动服务器 ====================
@@ -153,6 +175,16 @@ const server = http.createServer(async (req, res) => {
   if (await handleCategoryRoutes(req, res, { isAdmin, sendCachedJson, invalidateCache })) return;
   if (await handleAssetRoutes(req, res, { userId, sendCachedJson, invalidateCache })) return;
   if (await handleDailyProfitRoutes(req, res, userId)) return;
+
+  // 盘中收益快照
+  if (req.method === 'GET' && req.url.startsWith('/api/intraday-snapshots')) {
+    const urlObj = new URL(req.url, `http://${req.headers.host}`);
+    const date = urlObj.searchParams.get('date') || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    sendCachedJson(req, res, `intraday-snapshots:${date}:${userId}`, async () => {
+      return await db.getIntradaySnapshots(date, userId);
+    });
+    return true;
+  }
   if (await handleAlertRulesRoutes(req, res, ctx)) return;
   if (await handleAIAnalysisRoutes(req, res)) return;
   if (await handleFundRoutes(req, res, { userId, sendCachedJson, invalidateCache, invalidateCacheByPrefix })) return;

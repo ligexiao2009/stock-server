@@ -184,6 +184,23 @@ CREATE TABLE IF NOT EXISTS asset_records (
 CREATE INDEX IF NOT EXISTS idx_asset_records_recorded_at ON asset_records(recorded_at);
 CREATE INDEX IF NOT EXISTS idx_asset_records_user_id     ON asset_records(user_id);
 
+-- 盘中收益快照（每5分钟记录一次）
+CREATE TABLE IF NOT EXISTS intraday_snapshots (
+    id            SERIAL PRIMARY KEY,
+    user_id       VARCHAR(50) NOT NULL DEFAULT 'default',
+    date          VARCHAR(8)  NOT NULL,
+    time          VARCHAR(5)  NOT NULL,
+    stock_profit  DECIMAL(15, 2) DEFAULT 0,
+    fund_profit   DECIMAL(15, 2) DEFAULT 0,
+    total_profit  DECIMAL(15, 2) DEFAULT 0,
+    stock_market  DECIMAL(15, 2) DEFAULT 0,
+    fund_market   DECIMAL(15, 2) DEFAULT 0,
+    total_market  DECIMAL(15, 2) DEFAULT 0,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_intraday_snapshots_date_user ON intraday_snapshots(date, user_id);
+
 -- ==================== 预设分类 ====================
 INSERT INTO categories (id, name, sort_order) VALUES
     ('a_stock_large',  'A股大盘',  1),

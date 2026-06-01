@@ -83,8 +83,10 @@ async function handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CAC
         if (!hkDate) hkDate = isWeekday ? 'weekday' : 'weekend';
         sendJson(res, 200, { aStockOpen: isWeekday, hkStockOpen: isWeekday, shDate, hkDate });
       } else {
-        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        sendJson(res, 200, { aStockOpen: shDate === today, hkStockOpen: hkDate === today, shDate, hkDate });
+        // 用本地日期（UTC+8）而非 UTC 日期判断
+        const now = new Date();
+        const localToday = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+        sendJson(res, 200, { aStockOpen: shDate === localToday, hkStockOpen: hkDate === localToday, shDate, hkDate });
       }
     } catch (e) {
       sendJson(res, 500, { error: e.message });
