@@ -47,6 +47,8 @@ async function takeSnapshot() {
   const allRows = await db.getPositions();
   const hkdRate = parseFloat(await db.getConfig('hkd_cny_rate')) || HKD_RATE_DEFAULT;
   const usdRate = parseFloat(await db.getConfig('crypto_fx')) || USD_RATE_DEFAULT;
+  console.log(`市场状态: A股=${aOpen} 港股=${hkOpen} | 汇率: HKD=${hkdRate} USD=${usdRate}`);
+  console.log(`持仓总数: ${allRows.length}`);
 
   // 按用户分组
   const userMap = {};
@@ -59,6 +61,7 @@ async function takeSnapshot() {
   for (const [userId, rows] of Object.entries(userMap)) {
     const stocks = rows.filter(r => !r.isFund && r.code);
     const funds = rows.filter(r => r.isFund && r.code);
+    console.log(`\n用户 ${userId}: 股票=${stocks.length}只 基金=${funds.length}只`);
 
     // 批量获取行情
     const specs = rows.map(r => ({ code: r.code, isFund: r.isFund }));
@@ -69,10 +72,16 @@ async function takeSnapshot() {
 
     for (const stock of stocks) {
       // 港股休市跳过（A股收盘后仍用最后价格）
-      if (stock.code.length === 5 && !hkOpen) continue;
+      if (stock.code.length === 5 && !hkOpen) {
+        console.log(`  [跳过] ${stock.code} ${stock.name} 港股休市`);
+        continue;
+      }
 
       const q = quotes[`${stock.code}:0`];
-      if (!q || q.price <= 0 || stock.shares <= 0) continue;
+      if (!q || q.price <= 0 || stock.shares <= 0) {
+        console.log(`  [跳过] ${stock.code} ${stock.name} 行情无效 price=${q?.price} shares=${stock.shares}`);
+        continue;
+      }
 
       let price = q.price;
       if (stock.code.length === 5) price *= hkdRate;
@@ -82,6 +91,8 @@ async function takeSnapshot() {
       const profit = prevMkt * (q.change / 100);
       stockProfit += profit;
       stockMarket += mkt;
+
+      console.log(`  [股票] ${stock.code} ${stock.name} | 股数=${stock.shares} 行情价=${q.price} 汇率后=${price.toFixed(2)} 涨跌=${q.change}% 市值=${mkt.toFixed(0)} 收益=${profit.toFixed(0)}`);
     }
 
     // 基金用天天基金估值接口
