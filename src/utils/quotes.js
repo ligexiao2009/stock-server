@@ -67,17 +67,28 @@ async function fetchQuotesBatch(items) {
 
   const quotes = {};
 
-  // TickFlow 优先获取港股（有 timestamp 可判断休市）
+  // TickFlow 优先获取港股（有 timestamp 可判断休市），失败重试一次，不降级腾讯
   const hkCodes = normalizedItems
     .filter(item => !item.isFund && item.code.length === 5)
     .map(item => item.code);
+  const hkItems = normalizedItems.filter(item => !item.isFund && item.code.length === 5);
   if (hkCodes.length > 0) {
-    const tfQuotes = await fetchHKQuotesViaTickFlow(hkCodes);
-    Object.assign(quotes, tfQuotes);
+    let tfQuotes = await fetchHKQuotesViaTickFlow(hkCodes);
+    // 重试一次
+    if (Object.keys(tfQuotes).length === 0 && hkCodes.length > 0) {
+      console.log(`[TickFlow] 首次失败，1秒后重试 codes=${hkCodes.join(',')}`);
+      await new Promise(r => setTimeout(r, 1000));
+      tfQuotes = await fetchHKQuotesViaTickFlow(hkCodes);
+    }
+    if (Object.keys(tfQuotes).length > 0) {
+      Object.assign(quotes, tfQuotes);
+    } else {
+      console.error(`[TickFlow] 重试仍失败，港股行情不可用 codes=${hkCodes.join(',')}`);
+    }
   }
 
-  // 剩余走腾讯行情
-  const remaining = normalizedItems.filter(item => !quotes[item.key]);
+  // 剩余走腾讯行情（仅非港股）
+  const remaining = normalizedItems.filter(item => !quotes[item.key] && !(item.code.length === 5 && !item.isFund));
   for (let i = 0; i < remaining.length; i += QUOTES_BATCH_SIZE) {
     const batch = remaining.slice(i, i + QUOTES_BATCH_SIZE);
     if (!batch.length) continue;
@@ -112,7 +123,10 @@ async function fetchQuotesBatch(items) {
 /** TickFlow 获取港股实时行情（带时间戳，可判断休市） */
 async function fetchHKQuotesViaTickFlow(codes) {
   const TICKFLOW_KEY = process.env.TICKFLOW_API_KEY || '';
-  if (!TICKFLOW_KEY || !codes.length) return {};
+  if (!TICKFLOW_KEY || !codes.length) {
+    console.log(`[TickFlow] 未配置 API_KEY 或无港股 codes=${codes.join(',')}`);
+    return {};
+  }
 
   try {
     const symbols = codes.map(c => `${c}.HK`).join(',');
@@ -122,6 +136,11 @@ async function fetchHKQuotesViaTickFlow(codes) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const body = await resp.json();
     const data = body.data || [];
+
+    if (data.length === 0) {
+      console.log(`[TickFlow] 返回空数据 symbols=${symbols}`);
+      return {};
+    }
 
     const result = {};
     for (const item of data) {
@@ -137,9 +156,10 @@ async function fetchHKQuotesViaTickFlow(codes) {
         priceDate: dateStr,
       };
     }
+    console.log(`[TickFlow] 成功 codes=${codes.join(',')} count=${data.length}`);
     return result;
   } catch (e) {
-    // 静默降级
+    console.error(`[TickFlow] 请求失败: ${e.message} codes=${codes.join(',')}`);
     return {};
   }
 }
