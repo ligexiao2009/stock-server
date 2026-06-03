@@ -12,4 +12,4 @@ if [ -n "$PID" ]; then
 fi
 
 echo "启动服务器..."
-nohup node src/server.js > server.log 2>&1 &
+nohup node src/server.js >> server.log 2>&1 &
