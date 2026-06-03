@@ -127,6 +127,39 @@ async function setupCronJob() {
     takeCryptoSnapshot().catch(e => console.error('加密币快照失败:', e.message));
   });
 
+  // AI 批量分析持仓股票（工作日 15:20，收盘后触发）
+  global.aiAnalysisJob = cron.schedule('20 15 * * 1-5', async () => {
+    try {
+      const { exec } = require('child_process');
+      const positions = await db.getPositions() || [];
+      const codes = [...new Set(
+        positions
+          .filter(p => !p.is_fund)
+          .map(p => p.code)
+          .filter(Boolean)
+      )];
+      if (codes.length === 0) {
+        console.log('[AI分析] 没有持仓股票，跳过批量分析');
+        return;
+      }
+      const codeList = codes.join(',');
+      const pyDir = process.env.AI_ANALYSIS_DIR || '/Users/yangyang/git/daily_stock_analysis';
+      const useProxy = process.env.AI_USE_PROXY ? `HTTP_PROXY=${process.env.AI_USE_PROXY} HTTPS_PROXY=${process.env.AI_USE_PROXY}` : '';
+      const useVenv = process.env.AI_USE_VENV === 'true' ? 'source venv/bin/activate &&' : '';
+      console.log(`[AI分析] 开始批量分析 ${codes.length} 只股票: ${codeList}`);
+      exec(
+        `cd ${pyDir} && ${useProxy} ${useVenv} python3 main.py --stocks ${codeList} --no-market-review --force-run`,
+        { timeout: 600000 },
+        (err, stdout, stderr) => {
+          if (err) console.error('[AI分析] 批量分析失败:', err.message);
+          else console.log('[AI分析] 批量分析完成');
+        }
+      );
+    } catch (e) {
+      console.error('[AI分析] 定时任务异常:', e.message);
+    }
+  }, { timezone: 'Asia/Shanghai' });
+
   // 每天 00:05 清理 7 天前的快照数据
   global.snapshotCleanupJob = cron.schedule('5 0 * * *', async () => {
     try {
@@ -141,7 +174,7 @@ async function setupCronJob() {
     }
   }, { timezone: 'Asia/Shanghai' });
 
-  console.log(`定时任务已设置: 基金提醒 ${cronTime}, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每5分钟, 港股收盘 16:10, 晚间 23:30, 加密币 24/7每5分钟, 快照清理 每天00:05`);
+  console.log(`定时任务已设置: 基金提醒 ${cronTime}, AI批量分析 工作日15:20, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每5分钟, 港股收盘 16:10, 晚间 23:30, 加密币 24/7每5分钟, 快照清理 每天00:05`);
 }
 
 // ==================== 启动服务器 ====================
