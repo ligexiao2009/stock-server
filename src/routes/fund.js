@@ -77,11 +77,7 @@ async function handleFundRoutes(req, res, { userId, sendCachedJson, invalidateCa
         sendJson(res, 400, { success: false, error: 'fundCodes 必须是数组' });
         return true;
       }
-      const results = [];
-      for (const code of fundCodes) {
-        results.push(await fetchFundEstimate(code));
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      const results = await Promise.all(fundCodes.map(code => fetchFundEstimate(code)));
       sendJson(res, 200, { success: true, results });
     } catch (e) {
       sendJson(res, 500, { success: false, error: e.message });

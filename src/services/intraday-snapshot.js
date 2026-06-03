@@ -4,10 +4,10 @@
 const db = require('../db/db');
 const { fetchQuotesBatch, setHKQuoteCache } = require('../utils/quotes');
 
-/** 批量获取基金盘中估值（天天基金） */
+/** 批量获取基金盘中估值（天天基金，并行请求） */
 async function fetchFundEstimates(codes) {
   const results = {};
-  for (const code of codes) {
+  const tasks = codes.map(async code => {
     try {
       const resp = await fetch(`http://fundgz.1234567.com.cn/js/${code}.js`);
       const text = await resp.text();
@@ -20,8 +20,8 @@ async function fetchFundEstimates(codes) {
         };
       }
     } catch (_) {}
-    await new Promise(r => setTimeout(r, 50));
-  }
+  });
+  await Promise.all(tasks);
   return results;
 }
 
