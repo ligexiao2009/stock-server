@@ -2,7 +2,7 @@
  * 盘中收益快照服务 — 每5分钟记录一次当日收益走势
  */
 const db = require('../db/db');
-const { fetchQuotesBatch } = require('../utils/quotes');
+const { fetchQuotesBatch, setHKQuoteCache } = require('../utils/quotes');
 
 /** 批量获取基金盘中估值（天天基金） */
 async function fetchFundEstimates(codes) {
@@ -66,6 +66,7 @@ async function takeSnapshot() {
     // 批量获取行情
     const specs = rows.map(r => ({ code: r.code, isFund: r.isFund }));
     const quotes = await fetchQuotesBatch(specs);
+    setHKQuoteCache(quotes);
 
     let stockProfit = 0, fundProfit = 0;
     let stockMarket = 0, fundMarket = 0;

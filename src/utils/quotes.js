@@ -2,6 +2,8 @@
  * 行情数据获取 — 腾讯行情接口 qt.gtimg.cn
  */
 const QUOTES_BATCH_SIZE = Number(process.env.QUOTES_BATCH_SIZE || 60);
+const HK_CACHE_TTL_MS = 5 * 60 * 1000; // 5分钟缓存
+const hkQuoteCache = new Map(); // code -> { data, ts }
 
 /** 根据代码和类型构建腾讯行情 symbol */
 function buildQuoteSymbol(code, isFund) {
@@ -45,6 +47,16 @@ async function decodeQtResponse(response) {
   return new TextDecoder('gb18030').decode(buffer);
 }
 
+/** 将港股行情写入缓存（快照服务调用） */
+function setHKQuoteCache(quotes) {
+  const now = Date.now();
+  for (const [key, data] of Object.entries(quotes)) {
+    if (key.endsWith(':0') && data.code && data.code.length === 5) {
+      hkQuoteCache.set(key, { data, ts: now });
+    }
+  }
+}
+
 /** 批量获取行情数据 */
 async function fetchQuotesBatch(items) {
   const normalizedItems = [];
@@ -67,14 +79,23 @@ async function fetchQuotesBatch(items) {
 
   const quotes = {};
 
-  // TickFlow 优先获取港股（有 timestamp 可判断休市），失败重试一次，不降级腾讯
-  const hkCodes = normalizedItems
-    .filter(item => !item.isFund && item.code.length === 5)
-    .map(item => item.code);
+  // 港股：优先从缓存取（快照服务每5分钟更新），缓存未命中再走 TickFlow
   const hkItems = normalizedItems.filter(item => !item.isFund && item.code.length === 5);
-  if (hkCodes.length > 0) {
+  const now = Date.now();
+  const uncachedHK = [];
+
+  for (const item of hkItems) {
+    const cached = hkQuoteCache.get(item.key);
+    if (cached && now - cached.ts < HK_CACHE_TTL_MS) {
+      quotes[item.key] = cached.data;
+    } else {
+      uncachedHK.push(item);
+    }
+  }
+
+  if (uncachedHK.length > 0) {
+    const hkCodes = uncachedHK.map(item => item.code);
     let tfQuotes = await fetchHKQuotesViaTickFlow(hkCodes);
-    // 重试一次
     if (Object.keys(tfQuotes).length === 0 && hkCodes.length > 0) {
       console.log(`[TickFlow] 首次失败，1秒后重试 codes=${hkCodes.join(',')}`);
       await new Promise(r => setTimeout(r, 1000));
@@ -82,6 +103,8 @@ async function fetchQuotesBatch(items) {
     }
     if (Object.keys(tfQuotes).length > 0) {
       Object.assign(quotes, tfQuotes);
+      // 写入缓存供后续使用
+      setHKQuoteCache(tfQuotes);
     } else {
       console.error(`[TickFlow] 重试仍失败，港股行情不可用 codes=${hkCodes.join(',')}`);
     }
@@ -189,5 +212,6 @@ module.exports = {
   fetchHKQuotesViaTickFlow,
   fetchStockPrice,
   fetchFundNetValue,
+  setHKQuoteCache,
   QUOTES_BATCH_SIZE,
 };
