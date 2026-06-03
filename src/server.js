@@ -127,7 +127,21 @@ async function setupCronJob() {
     takeCryptoSnapshot().catch(e => console.error('加密币快照失败:', e.message));
   });
 
-  console.log(`定时任务已设置: 基金提醒 ${cronTime}, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每5分钟, 港股收盘 16:10, 晚间 23:30, 加密币 24/7每5分钟`);
+  // 每天 00:05 清理 7 天前的快照数据
+  global.snapshotCleanupJob = cron.schedule('5 0 * * *', async () => {
+    try {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 7);
+      const dateStr = `${cutoff.getFullYear()}${String(cutoff.getMonth() + 1).padStart(2, '0')}${String(cutoff.getDate()).padStart(2, '0')}`;
+      const r1 = await db.query('DELETE FROM intraday_snapshots WHERE date < $1', [dateStr]);
+      const r2 = await db.query('DELETE FROM crypto_snapshots WHERE date < $1', [dateStr]);
+      console.log(`[快照清理] 删除 ${dateStr} 之前数据: intraday=${r1.rowCount}条, crypto=${r2.rowCount}条`);
+    } catch (e) {
+      console.error('快照清理失败:', e.message);
+    }
+  }, { timezone: 'Asia/Shanghai' });
+
+  console.log(`定时任务已设置: 基金提醒 ${cronTime}, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每5分钟, 港股收盘 16:10, 晚间 23:30, 加密币 24/7每5分钟, 快照清理 每天00:05`);
 }
 
 // ==================== 启动服务器 ====================
