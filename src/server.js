@@ -217,9 +217,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (req.method === 'GET' && req.url === '/api/trigger-profit') {
-    calculateAndSaveDailyProfit();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, message: '每日收益计算已触发' }));
+    try {
+      await calculateAndSaveDailyProfit();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: '每日收益计算已完成' }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, message: e.message }));
+    }
     return;
   }
   if (req.method === 'GET' && req.url === '/api/trigger-confirm') {
