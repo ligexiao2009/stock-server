@@ -143,7 +143,7 @@ async function setupCronJob() {
       const positions = await db.getPositions() || [];
       const codes = [...new Set(
         positions
-          .filter(p => !p.is_fund)
+          .filter(p => !p.isFund && /^\d+$/.test(p.code))
           .map(p => p.code)
           .filter(Boolean)
       )];
@@ -154,14 +154,16 @@ async function setupCronJob() {
       const codeList = codes.join(',');
       const pyDir = process.env.AI_ANALYSIS_DIR || '/Users/yangyang/git/daily_stock_analysis';
       const useProxy = process.env.AI_USE_PROXY ? `HTTP_PROXY=${process.env.AI_USE_PROXY} HTTPS_PROXY=${process.env.AI_USE_PROXY}` : '';
-      const useVenv = process.env.AI_USE_VENV === 'true' ? 'source venv/bin/activate &&' : '';
+      const python = process.env.AI_USE_VENV === 'true' ? 'venv/bin/python3' : 'python3';
       console.log(`[AI分析] 开始批量分析 ${codes.length} 只股票: ${codeList}`);
       exec(
-        `cd ${pyDir} && ${useProxy} ${useVenv} python3 main.py --stocks ${codeList} --no-market-review --force-run`,
+        `cd ${pyDir} && ${useProxy} ${python} main.py --stocks ${codeList} --no-market-review --force-run`,
         { timeout: 600000 },
         (err, stdout, stderr) => {
-          if (err) console.error('[AI分析] 批量分析失败:', err.message);
-          else console.log('[AI分析] 批量分析完成');
+          if (err) {
+            console.error('[AI分析] 批量分析失败:', err.message);
+            if (stderr) console.error('[AI分析] stderr:', stderr);
+          } else console.log('[AI分析] 批量分析完成');
         }
       );
     } catch (e) {
