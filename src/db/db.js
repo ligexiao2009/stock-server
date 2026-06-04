@@ -9,7 +9,7 @@ if (process.env.DATABASE_URL) {
   poolConfig = {
     connectionString: process.env.DATABASE_URL,
     max: 20, // maximum number of clients in the pool
-    idleTimeoutMillis: 60000,
+    idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
     ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('supabase.co') ? { rejectUnauthorized: false } : false,
   };
@@ -22,14 +22,23 @@ if (process.env.DATABASE_URL) {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '',
     max: 20,
-    idleTimeoutMillis: 60000,
+    idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
   };
 }
 
 const pool = new Pool({ ...poolConfig, options: '-c timezone=Asia/Shanghai' });
 
+// 每个新连接开启 TCP keepalive，防止中间网络设备断开空闲连接
+pool.on('connect', (client) => {
+  if (client.connection && client.connection.stream) {
+    client.connection.stream.setKeepAlive(true, 60000);
+  }
+});
+
 pool.on('error', (err) => {
+  // 空闲连接被中间网络设备断开属于正常现象，pool 会自动重建，无需记录
+  if (err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET') return;
   console.error('Unexpected error on idle client', err);
 });
 
