@@ -38,16 +38,18 @@ async function fetchMinuteData(symbol) {
   } catch (e) { console.error('获取分时图失败:', e.message); return []; }
 }
 
-async function fetchKline(symbol) {
+async function fetchKline(symbol, period = 'day') {
   try {
-    const url = `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=kline_day&param=${symbol},day,,,365,qfq`;
+    const datalen = period === 'day' ? 1200 : (period === 'week' ? 500 : 240);
+    const p = period; // day | week | month
+    const url = `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=kline_${p}&param=${symbol},${p},,,${datalen},qfq`;
     const resp = await fetch(url);
     if (!resp.ok) return [];
     const text = await resp.text();
     const jsonText = text.includes('=') ? text.slice(text.indexOf('=') + 1).replace(/;$/, '').trim() : text;
     const payload = JSON.parse(jsonText);
     const stockData = payload?.data?.[symbol];
-    const list = stockData ? (stockData.qfqday || stockData.day || []) : [];
+    const list = stockData ? (stockData[`qfq${p}`] || stockData[p] || []) : [];
     return list.map(item => {
       if (Array.isArray(item) && item.length >= 5) {
         return { day: String(item[0]), open: String(item[1]), close: String(item[2]), high: String(item[3]), low: String(item[4]), volume: String(item[5] || '0') };
@@ -133,13 +135,16 @@ async function fetchUSMinuteData(code) {
   } catch (e) { console.error('US minute失败:', e.message); return []; }
 }
 
-async function fetchUSKline(code) {
+async function fetchUSKline(code, period = 'day') {
   try {
-    const url = `https://stock.finance.sina.com.cn/usstock/api/json_v2.php/US_MinKService.getDailyK?symbol=${code.toLowerCase()}&type=daily&num=365`;
+    const typeMap = { day: 'daily', week: 'weekly', month: 'monthly' };
+    const type = typeMap[period] || 'daily';
+    const num = period === 'day' ? 1200 : (period === 'week' ? 500 : 240);
+    const url = `https://stock.finance.sina.com.cn/usstock/api/json_v2.php/US_MinKService.getDailyK?symbol=${code.toLowerCase()}&type=${type}&num=${num}`;
     const resp = await fetch(url, { headers: { 'Referer': 'https://finance.sina.com.cn' } });
     if (!resp.ok) return [];
     const data = await resp.json();
-    return data.slice(-365).map(item => ({
+    return data.slice(-num).map(item => ({
       day: item.d,
       open: String(item.o),
       close: String(item.c),
@@ -156,12 +161,12 @@ function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 // ========== 主入口 ==========
 
-async function getStockDetail(code) {
+async function getStockDetail(code, period = 'day') {
   // 美股
   if (isUSStock(code)) {
     const [minuteData, klineData, quote] = await Promise.all([
       fetchUSMinuteData(code),
-      fetchUSKline(code),
+      fetchUSKline(code, period),
       fetchUSQuote(code),
     ]);
 
@@ -194,7 +199,7 @@ async function getStockDetail(code) {
   const isHK = code.length === 5;
   const [minuteData, klineData, quoteResult] = await Promise.all([
     fetchMinuteData(symbol),
-    fetchKline(symbol),
+    fetchKline(symbol, period),
     isHK
       ? fetchQuotesBatch([{ code, isFund: false }])
       : fetchQuotes([symbol]).then(q => q),

@@ -234,7 +234,8 @@ async function handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CAC
     try {
       const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
       const code = parsedUrl.pathname.split('/api/stock-detail/')[1].replace(/\/$/, '');
-      const detail = await getStockDetail(code);
+      const period = parsedUrl.searchParams.get('period') || 'day';
+      const detail = await getStockDetail(code, period);
       sendJson(res, 200, detail);
     } catch (e) {
       sendJson(res, 500, { success: false, error: e.message });
