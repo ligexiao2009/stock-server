@@ -4,6 +4,15 @@
  */
 require('dotenv').config();
 
+// 给 console.log/error/warn 加上时间戳
+['log', 'error', 'warn'].forEach(method => {
+  const original = console[method];
+  console[method] = (...args) => {
+    const ts = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+    original(`[${ts}]`, ...args);
+  };
+});
+
 const http = require('http');
 const cron = require('node-cron');
 const db = require('./db/db');
@@ -70,7 +79,7 @@ async function setupCronJob() {
   const cronTime = process.env.ALERT_TIME || configs.alertTime || '0 22 * * *';
 
   // 清理旧任务
-  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'nightSnapshotJob', 'cryptoSnapshotJob']
+  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'nightSnapshotJob', 'cryptoSnapshotJob', 'snapshotBackupJob']
     .forEach(k => { if (global[k]) { if (Array.isArray(global[k])) global[k].forEach(j => j.stop()); else global[k].stop(); } });
 
   // 基金提醒
@@ -171,6 +180,18 @@ async function setupCronJob() {
       console.log(`[快照清理] 删除 ${dateStr} 之前数据: intraday=${r1.rowCount}条, crypto=${r2.rowCount}条`);
     } catch (e) {
       console.error('快照清理失败:', e.message);
+    }
+  }, { timezone: 'Asia/Shanghai' });
+
+  // 每天 16:30 备份当天 intraday_snapshots 到 intraday_snapshots_history
+  global.snapshotBackupJob = cron.schedule('30 16 * * *', async () => {
+    try {
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+      const count = await db.backupIntradaySnapshots(dateStr);
+      console.log(`[快照备份] ${dateStr} 备份完成: ${count}条`);
+    } catch (e) {
+      console.error('快照备份失败:', e.message);
     }
   }, { timezone: 'Asia/Shanghai' });
 

@@ -201,6 +201,25 @@ CREATE TABLE IF NOT EXISTS intraday_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_intraday_snapshots_date_user ON intraday_snapshots(date, user_id);
 
+-- 盘中快照历史备份表（每天16:30定时备份当天数据）
+CREATE TABLE IF NOT EXISTS intraday_snapshots_history (
+    id            SERIAL PRIMARY KEY,
+    user_id       VARCHAR(50) NOT NULL DEFAULT 'default',
+    date          VARCHAR(8)  NOT NULL,
+    time          VARCHAR(5)  NOT NULL,
+    stock_profit  DECIMAL(15, 2) DEFAULT 0,
+    fund_profit   DECIMAL(15, 2) DEFAULT 0,
+    total_profit  DECIMAL(15, 2) DEFAULT 0,
+    stock_market  DECIMAL(15, 2) DEFAULT 0,
+    fund_market   DECIMAL(15, 2) DEFAULT 0,
+    total_market  DECIMAL(15, 2) DEFAULT 0,
+    backup_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_intraday_snapshots_history_uniq ON intraday_snapshots_history(date, time, user_id);
+CREATE INDEX IF NOT EXISTS idx_intraday_snapshots_history_backup ON intraday_snapshots_history(backup_date);
+
 -- ==================== 加密币快照表 ====================
 CREATE TABLE IF NOT EXISTS crypto_snapshots (
     id            SERIAL PRIMARY KEY,

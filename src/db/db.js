@@ -606,6 +606,18 @@ async function getIntradaySnapshots(date, userId = null) {
   return res.rows.map(r => snakeToCamel(fixNumericFields(r)));
 }
 
+async function backupIntradaySnapshots(dateStr) {
+  const res = await query(
+    `INSERT INTO intraday_snapshots_history (user_id, date, time, stock_profit, fund_profit, total_profit, stock_market, fund_market, total_market)
+     SELECT user_id, date, time, stock_profit, fund_profit, total_profit, stock_market, fund_market, total_market
+     FROM intraday_snapshots
+     WHERE date = $1
+     ON CONFLICT (date, time, user_id) DO NOTHING`,
+    [dateStr]
+  );
+  return res.rowCount;
+}
+
 // ==================== Crypto Snapshots ====================
 async function saveCryptoSnapshot({ userId, date, time, code, name, price, cost, shares, profit }) {
   await query(
@@ -694,6 +706,7 @@ module.exports = {
   // Intraday snapshots
   saveIntradaySnapshot,
   getIntradaySnapshots,
+  backupIntradaySnapshots,
 
   // Crypto snapshots
   saveCryptoSnapshot,
