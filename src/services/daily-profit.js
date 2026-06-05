@@ -35,6 +35,23 @@ async function checkMarketOpen() {
   }
 }
 
+function getPrevClose(q) {
+  if (q.prev_close > 0) return q.prev_close;
+  return q.price / (1 + q.change / 100);
+}
+
+function calcStockProfit(price, prevClose, shares, cost, trades) {
+  let profit = (price - prevClose) * shares;
+  for (const t of trades || []) {
+    if (t.type === 'add') {
+      profit += (prevClose - t.netValue) * t.shares;
+    } else {
+      profit += (t.netValue - price) * t.shares;
+    }
+  }
+  return profit;
+}
+
 async function calculateAndSaveDailyProfit() {
   console.log('\n========== 开始计算每日收益 ==========');
   const allRows = await db.getPositions();
@@ -72,6 +89,13 @@ async function calculateAndSaveDailyProfit() {
     const usdRate = parseFloat(await db.getConfig('crypto_fx')) || 7.2;
     const marketStatus = await checkMarketOpen();
 
+    const todayTrades = stocks.length > 0 ? await db.getTodayTrades(userId, todayStr) : [];
+    const tradesByRow = {};
+    for (const t of todayTrades) {
+      if (!tradesByRow[t.rowId]) tradesByRow[t.rowId] = [];
+      tradesByRow[t.rowId].push(t);
+    }
+
     for (const stock of stocks) {
       // 休市跳过：港股5位代码 + HK休市 / A股6位 + A休市
       if (stock.code.length === 5 && !marketStatus.hkStockOpen) continue;
@@ -81,11 +105,11 @@ async function calculateAndSaveDailyProfit() {
       if (stockData && stockData.price > 0 && stock.shares > 0) {
         let price = stockData.price;
         if (stock.code.length === 5) price *= hkdRate;
+        const prevClose = getPrevClose(stockData);
         const mkt = stock.shares * price;
-        const prevMkt = (1 + stockData.change / 100) !== 0 ? mkt / (1 + stockData.change / 100) : mkt;
-        const today = prevMkt * (stockData.change / 100);
+        const today = calcStockProfit(price, prevClose, stock.shares, stock.cost, tradesByRow[stock.id] || []);
         stockToday += today;
-        details.push({ code: stock.code, name: stock.name || stock.code, type: 'stock', change: stockData.change, profit: Math.round(today) });
+        details.push({ code: stock.code, name: stock.name || stock.code, type: 'stock', change: stockData.change, profit: Math.round(today), prevClose: Math.round(prevClose * 100) / 100 });
       }
     }
 

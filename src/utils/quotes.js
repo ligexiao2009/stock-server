@@ -177,6 +177,7 @@ async function fetchHKQuotesViaTickFlow(codes) {
         price: item.last_price || 0,
         change: (item.ext?.change_pct || 0) * 100,
         priceDate: dateStr,
+        prev_close: item.prev_close || 0,
       };
     }
     console.log(`[TickFlow] 成功 codes=${codes.join(',')} count=${data.length}`);

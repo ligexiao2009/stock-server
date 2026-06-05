@@ -28,6 +28,23 @@ async function fetchFundEstimates(codes) {
 const HKD_RATE_DEFAULT = 0.92;
 const USD_RATE_DEFAULT = 7.2;
 
+function getPrevClose(q) {
+  if (q.prev_close > 0) return q.prev_close;
+  return q.price / (1 + q.change / 100);
+}
+
+function calcStockProfit(price, prevClose, shares, cost, trades) {
+  let profit = (price - prevClose) * shares;
+  for (const t of trades || []) {
+    if (t.type === 'add') {
+      profit += (prevClose - t.netValue) * t.shares;
+    } else {
+      profit += (t.netValue - price) * t.shares;
+    }
+  }
+  return profit;
+}
+
 async function takeSnapshot() {
   console.log('\n========== 盘中收益快照 ==========');
   const now = new Date();
@@ -71,6 +88,14 @@ async function takeSnapshot() {
     let stockProfit = 0, fundProfit = 0;
     let stockMarket = 0, fundMarket = 0;
 
+    // 查当日交易，用于修正收益
+    const todayTrades = stocks.length > 0 ? await db.getTodayTrades(userId, dateStr) : [];
+    const tradesByRow = {};
+    for (const t of todayTrades) {
+      if (!tradesByRow[t.rowId]) tradesByRow[t.rowId] = [];
+      tradesByRow[t.rowId].push(t);
+    }
+
     for (const stock of stocks) {
       // 港股休市跳过（A股收盘后仍用最后价格）
       if (stock.code.length === 5 && !hkOpen) {
@@ -87,13 +112,13 @@ async function takeSnapshot() {
       let price = q.price;
       if (stock.code.length === 5) price *= hkdRate;
 
+      const prevClose = getPrevClose(q);
+      const profit = calcStockProfit(price, prevClose, stock.shares, stock.cost, tradesByRow[stock.id] || []);
       const mkt = stock.shares * price;
-      const prevMkt = (1 + q.change / 100) !== 0 ? mkt / (1 + q.change / 100) : mkt;
-      const profit = prevMkt * (q.change / 100);
       stockProfit += profit;
       stockMarket += mkt;
 
-      console.log(`  [股票] ${stock.code} ${stock.name} | 股数=${stock.shares} 行情价=${q.price} 汇率后=${price.toFixed(2)} 涨跌=${q.change}% 市值=${mkt.toFixed(0)} 收益=${profit.toFixed(0)}`);
+      console.log(`  [股票] ${stock.code} ${stock.name} | 股数=${stock.shares} 行情价=${q.price} 汇率后=${price.toFixed(2)} 昨收=${prevClose.toFixed(2)} 收益=${profit.toFixed(0)}`);
     }
 
     // 基金用天天基金估值接口

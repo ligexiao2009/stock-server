@@ -340,6 +340,27 @@ async function createTradeRecord(record) {
   return record;
 }
 
+async function getTodayTrades(userId, date) {
+  const res = await query(
+    `SELECT id, row_id, type, amount, shares, net_value, is_before_15, created_at, local_date, user_id
+     FROM trade_history
+     WHERE user_id = $1 AND local_date = $2
+     ORDER BY created_at`,
+    [userId || 'default', date]
+  );
+  return res.rows.map(row => ({
+    id: row.id,
+    rowId: row.row_id,
+    type: row.type,
+    amount: parseFloat(row.amount) || 0,
+    shares: parseFloat(row.shares) || 0,
+    netValue: parseFloat(row.net_value) || 0,
+    isBefore15: row.is_before_15,
+    createdAt: row.created_at,
+    localDate: row.local_date,
+  }));
+}
+
 async function deleteTradeRecord(id) {
   await query('DELETE FROM trade_history WHERE id = $1', [id]);
 }
@@ -680,6 +701,7 @@ module.exports = {
   getTradeHistory,
   getTradeHistoryByRowId,
   createTradeRecord,
+  getTodayTrades,
   deleteTradeRecord,
 
   // Daily profits operations

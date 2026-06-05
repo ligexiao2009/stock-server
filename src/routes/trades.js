@@ -100,6 +100,23 @@ async function handleTradeRoutes(req, res, { userId, sendCachedJson, invalidateC
     return true;
   }
 
+  // GET /api/trade-history/today — 当日交易记录
+  if (req.method === 'GET' && req.url === '/api/trade-history/today') {
+    try {
+      const beijingNow = () => {
+        const d = new Date();
+        d.setHours(d.getHours() + 8); // UTC → Beijing
+        return d.toISOString().slice(0, 10);
+      };
+      const records = await db.getTodayTrades(userId, beijingNow());
+      sendJson(res, 200, { records });
+    } catch (e) {
+      console.error('Error getting today trades:', e);
+      sendJson(res, 500, { error: 'Failed to get today trades' });
+    }
+    return true;
+  }
+
   // GET /api/trade-history/:rowId
   if (req.method === 'GET' && req.url.startsWith('/api/trade-history/')) {
     try {
@@ -171,6 +188,50 @@ async function handleTradeRoutes(req, res, { userId, sendCachedJson, invalidateC
     } catch (e) {
       await db.query('ROLLBACK').catch(() => {});
       console.error('Error saving trade history:', e);
+      sendJson(res, 400, { success: false, message: e.message });
+    }
+    return true;
+  }
+
+  // POST /api/stock-trade — 股票直接交易（不走 pending，成交价已知）
+  if (req.method === 'POST' && req.url === '/api/stock-trade') {
+    try {
+      const { rowId, code, type, amount, shares, tradePrice } = await readJsonBody(req);
+      const pos = await db.getPosition(rowId);
+      if (!pos) { sendJson(res, 404, { error: '持仓不存在' }); return true; }
+
+      const isAdd = type === 'add';
+      const totalShares = isAdd ? pos.shares + shares : pos.shares - shares;
+      if (totalShares < 0) { sendJson(res, 400, { error: '减仓份额超过持仓' }); return true; }
+
+      const newCost = isAdd
+        ? (pos.cost * pos.shares + amount) / totalShares
+        : pos.cost;
+
+      await db.updatePosition(rowId, { shares: totalShares, cost: parseFloat(newCost.toFixed(4)) });
+
+      const beijingNow = () => {
+        const d = new Date();
+        d.setHours(d.getHours() + 8);
+        return d.toISOString().replace('T', ' ').slice(0, 19);
+      };
+      const localDate = beijingNow().slice(0, 10);
+      const tradeId = `${rowId}-${Date.now()}`;
+
+      await db.createTradeRecord({
+        id: tradeId, rowId, type, amount,
+        shares: parseFloat(shares.toFixed(2)),
+        netValue: parseFloat(tradePrice.toFixed(4)),
+        isBefore15: true,
+        createdAt: beijingNow(),
+        localDate,
+        user_id: userId,
+      });
+
+      invalidateCache('trade-history', `trade-history:${rowId}`);
+      sendJson(res, 200, { success: true, totalShares, newCost });
+    } catch (e) {
+      console.error('Error stock trade:', e);
       sendJson(res, 400, { success: false, message: e.message });
     }
     return true;

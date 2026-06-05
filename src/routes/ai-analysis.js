@@ -281,6 +281,27 @@ async function handleAIAnalysisRoutes(req, res) {
     return true;
   }
 
+  // GET /api/ai-analysis/backtest/performance — 整体回测表现
+  if (req.method === 'GET' && req.url === '/api/ai-analysis/backtest/performance') {
+    try {
+      const pyResp = await fetch(`${PY_BASE}/api/v1/backtest/performance`);
+      const data = await pyResp.json();
+      sendJson(res, 200, data);
+    } catch (e) { sendJson(res, 500, { error: e.message }); }
+    return true;
+  }
+
+  // GET /api/ai-analysis/backtest/results?code=X — 回测记录列表
+  if (req.method === 'GET' && req.url.startsWith('/api/ai-analysis/backtest/results')) {
+    try {
+      const qs = req.url.includes('?') ? req.url.split('?')[1] : '';
+      const pyResp = await fetch(`${PY_BASE}/api/v1/backtest/results${qs ? '?' + qs : ''}`);
+      const data = await pyResp.json();
+      sendJson(res, 200, data);
+    } catch (e) { sendJson(res, 500, { error: e.message }); }
+    return true;
+  }
+
   // GET /api/ai-analysis/backtest/:code — 单股回测
   if (req.method === 'GET' && req.url.startsWith('/api/ai-analysis/backtest/')) {
     try {
