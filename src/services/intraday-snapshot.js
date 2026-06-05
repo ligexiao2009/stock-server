@@ -112,7 +112,8 @@ async function takeSnapshot() {
       let price = q.price;
       if (stock.code.length === 5) price *= hkdRate;
 
-      const prevClose = getPrevClose(q);
+      const rawPrevClose = getPrevClose(q);
+      const prevClose = stock.code.length === 5 ? rawPrevClose * hkdRate : rawPrevClose;
       const profit = calcStockProfit(price, prevClose, stock.shares, stock.cost, tradesByRow[stock.id] || []);
       const mkt = stock.shares * price;
       stockProfit += profit;
@@ -136,9 +137,9 @@ async function takeSnapshot() {
         fundProfit += profit;
         fundMarket += mkt;
       } else {
-        // 估值不可用时降级到昨日净值
+        // 估值不可用时降级到腾讯净值（仅当天有效）
         const q = quotes[`${fund.code}:1`];
-        if (!q || q.price <= 0) continue;
+        if (!q || q.price <= 0 || q.priceDate !== dateStr) continue;
         const mkt = fund.shares * q.price;
         const prevMkt = (1 + q.change / 100) !== 0 ? mkt / (1 + q.change / 100) : mkt;
         const profit = prevMkt * (q.change / 100);

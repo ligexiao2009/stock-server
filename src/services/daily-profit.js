@@ -105,7 +105,8 @@ async function calculateAndSaveDailyProfit() {
       if (stockData && stockData.price > 0 && stock.shares > 0) {
         let price = stockData.price;
         if (stock.code.length === 5) price *= hkdRate;
-        const prevClose = getPrevClose(stockData);
+        const rawPrevClose = getPrevClose(stockData);
+        const prevClose = stock.code.length === 5 ? rawPrevClose * hkdRate : rawPrevClose;
         const mkt = stock.shares * price;
         const today = calcStockProfit(price, prevClose, stock.shares, stock.cost, tradesByRow[stock.id] || []);
         stockToday += today;
