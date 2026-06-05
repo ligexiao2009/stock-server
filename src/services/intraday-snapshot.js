@@ -39,7 +39,7 @@ function calcStockProfit(price, prevClose, shares, cost, trades) {
     if (t.type === 'add') {
       profit += (prevClose - t.netValue) * t.shares;
     } else {
-      profit += (t.netValue - price) * t.shares;
+      profit += (t.netValue - prevClose) * t.shares;
     }
   }
   return profit;
