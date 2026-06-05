@@ -706,7 +706,15 @@ async function getPositionConfig(userId) {
     'SELECT * FROM position_config WHERE user_id = $1',
     [userId || 'default']
   );
-  return res.rows[0] || null;
+  const row = res.rows[0];
+  if (!row) return null;
+  return {
+    target_pct: parseInt(row.target_pct) || 80,
+    cash_reserve: parseFloat(row.cash_reserve) || 0,
+    batch_count: parseInt(row.batch_count) || 4,
+    signal_enabled: row.signal_enabled === true || row.signal_enabled === 'true',
+    signal_pct: parseFloat(row.signal_pct) || -10,
+  };
 }
 
 async function savePositionConfig(userId, data) {
