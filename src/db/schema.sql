@@ -248,7 +248,7 @@ INSERT INTO categories (id, name, sort_order) VALUES
     ('sector_fund',    '行业基金', 6),
     ('bond_fund',      '债券基金', 7),
     ('hybrid_fund',    '混合基金', 8),
-    ('overseas_fund',  '海外基金', 9)
+    ('crypto',  '加密币', 9)
 ON CONFLICT (id) DO NOTHING;
 
 -- ==================== 倒计时事件表 ====================
