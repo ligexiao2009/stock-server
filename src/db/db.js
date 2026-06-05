@@ -669,6 +669,84 @@ async function getCryptoSnapshots(startDate, userId = null) {
   return res.rows.map(r => snakeToCamel(fixNumericFields(r)));
 }
 
+// ==================== 倒计时事件 ====================
+async function getCountdownEvents(userId) {
+  const res = await query(
+    'SELECT id, name, event_date FROM countdown_events WHERE user_id = $1 ORDER BY event_date',
+    [userId || 'default']
+  );
+  return res.rows.map(r => {
+    const d = r.event_date;
+    const dateStr = d instanceof Date
+      ? d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0')
+      : String(d).slice(0, 10);
+    return { id: r.id, name: r.name, date: dateStr };
+  });
+}
+
+async function createCountdownEvent({ name, date, userId }) {
+  const res = await query(
+    'INSERT INTO countdown_events (name, event_date, user_id) VALUES ($1, $2, $3) RETURNING id',
+    [name, date, userId || 'default']
+  );
+  return res.rows[0].id;
+}
+
+async function deleteCountdownEvent(id, userId) {
+  await query(
+    'DELETE FROM countdown_events WHERE id = $1 AND user_id = $2',
+    [id, userId || 'default']
+  );
+}
+
+// ==================== 仓位管理 ====================
+
+async function getPositionConfig(userId) {
+  const res = await query(
+    'SELECT * FROM position_config WHERE user_id = $1',
+    [userId || 'default']
+  );
+  return res.rows[0] || null;
+}
+
+async function savePositionConfig(userId, data) {
+  const { targetPct, cashReserve, batchCount, signalEnabled, signalPct } = data;
+  await query(
+    `INSERT INTO position_config (user_id, target_pct, cash_reserve, batch_count, signal_enabled, signal_pct, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+     ON CONFLICT (user_id) DO UPDATE SET
+       target_pct = EXCLUDED.target_pct,
+       cash_reserve = EXCLUDED.cash_reserve,
+       batch_count = EXCLUDED.batch_count,
+       signal_enabled = EXCLUDED.signal_enabled,
+       signal_pct = EXCLUDED.signal_pct,
+       updated_at = NOW()`,
+    [userId || 'default', targetPct ?? 80, cashReserve ?? 0, batchCount ?? 4, signalEnabled ?? false, signalPct ?? -10]
+  );
+}
+
+async function getBatchPlans(userId) {
+  const res = await query(
+    'SELECT * FROM batch_plans WHERE user_id = $1 ORDER BY sort_order',
+    [userId || 'default']
+  );
+  return res.rows.map(r => ({
+    id: r.id, sortOrder: r.sort_order, amount: parseFloat(r.amount) || 0,
+    triggerPct: parseFloat(r.trigger_pct) || 0, status: r.status,
+  }));
+}
+
+async function saveBatchPlans(userId, plans) {
+  await query('DELETE FROM batch_plans WHERE user_id = $1', [userId || 'default']);
+  for (const p of plans) {
+    await query(
+      `INSERT INTO batch_plans (user_id, sort_order, amount, trigger_pct, status)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId || 'default', p.sortOrder, p.amount, p.triggerPct ?? 0, p.status || 'pending']
+    );
+  }
+}
+
 module.exports = {
   // Database connection
   pool,
@@ -742,5 +820,16 @@ module.exports = {
   // Crypto snapshots
   saveCryptoSnapshot,
   getCryptoSnapshots,
+
+  // Countdown events
+  getCountdownEvents,
+  createCountdownEvent,
+  deleteCountdownEvent,
+
+  // Position management
+  getPositionConfig,
+  savePositionConfig,
+  getBatchPlans,
+  saveBatchPlans,
 
 };

@@ -251,6 +251,43 @@ INSERT INTO categories (id, name, sort_order) VALUES
     ('overseas_fund',  '海外基金', 9)
 ON CONFLICT (id) DO NOTHING;
 
+-- ==================== 倒计时事件表 ====================
+CREATE TABLE IF NOT EXISTS countdown_events (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        VARCHAR(200) NOT NULL,
+    event_date  DATE NOT NULL,
+    user_id     VARCHAR(50) NOT NULL DEFAULT 'default',
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_countdown_events_user_id ON countdown_events(user_id);
+
+-- ==================== 仓位管理配置表 ====================
+CREATE TABLE IF NOT EXISTS position_config (
+    id              SERIAL PRIMARY KEY,
+    user_id         VARCHAR(50) NOT NULL UNIQUE,
+    target_pct      INT DEFAULT 80,
+    cash_reserve    DECIMAL(15, 2) DEFAULT 0,
+    batch_count     INT DEFAULT 4,
+    signal_enabled  BOOLEAN DEFAULT false,
+    signal_pct      DECIMAL(5, 2) DEFAULT -10,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==================== 分批计划表 ====================
+CREATE TABLE IF NOT EXISTS batch_plans (
+    id              SERIAL PRIMARY KEY,
+    user_id         VARCHAR(50) NOT NULL,
+    sort_order      INT NOT NULL,
+    amount          DECIMAL(15, 2) NOT NULL,
+    trigger_pct     DECIMAL(5, 2),
+    status          VARCHAR(10) DEFAULT 'pending',
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_plans_user ON batch_plans(user_id);
+
 -- ==================== 视图 ====================
 DROP VIEW IF EXISTS daily_profits_summary;
 CREATE VIEW daily_profits_summary AS

@@ -46,6 +46,8 @@ const { handleDailyProfitRoutes } = require('./routes/daily-profit');
 const { handleAlertRulesRoutes, checkPriceAlerts } = require('./routes/alert-rules');
 const { handleFundScreenshotRoutes, loadCodeFixMap } = require('./routes/fund-screenshot');
 const { handleNotesRoutes } = require('./routes/notes');
+const { handleCountdownRoutes } = require('./routes/countdown');
+const { handlePositionConfigRoutes } = require('./routes/position-config');
 
 const PORT = 4000;
 
@@ -264,6 +266,8 @@ const server = http.createServer(async (req, res) => {
   if (await handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CACHE_TTL_MS, KLINE_CACHE_TTL_MS })) return;
   if (await handleFundScreenshotRoutes(req, res, { fetchQuotesBatch })) return;
   if (await handleNotesRoutes(req, res, { userId })) return;
+  if (await handleCountdownRoutes(req, res, { userId })) return;
+  if (await handlePositionConfigRoutes(req, res, { userId })) return;
 
   // 手动触发 (测试用)
   if (req.method === 'GET' && req.url === '/api/trigger-check') {
