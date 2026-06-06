@@ -733,6 +733,13 @@ async function savePositionConfig(userId, data) {
   );
 }
 
+async function adjustCashReserve(userId, delta) {
+  await query(
+    `UPDATE position_config SET cash_reserve = GREATEST(0, cash_reserve + $1), updated_at = NOW() WHERE user_id = $2`,
+    [delta, userId || 'default']
+  );
+}
+
 async function getBatchPlans(userId) {
   const res = await query(
     'SELECT * FROM batch_plans WHERE user_id = $1 ORDER BY sort_order',
@@ -837,6 +844,7 @@ module.exports = {
   // Position management
   getPositionConfig,
   savePositionConfig,
+  adjustCashReserve,
   getBatchPlans,
   saveBatchPlans,
 

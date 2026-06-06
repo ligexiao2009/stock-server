@@ -133,6 +133,14 @@ async function setupCronJob() {
     takeSnapshot().catch(e => console.error('晚间快照失败:', e.message));
   }, { timezone: 'Asia/Shanghai' });
 
+  // 补仓信号检测（工作日 09:30 + 14:00）
+  if (process.env.SERVERCHAN_KEY) {
+    const { checkIndexDrawdownAlerts } = require('./services/index-alert');
+    ['30 9 * * 1-5', '0 15 * * 1-5'].forEach(t =>
+      cron.schedule(t, () => checkIndexDrawdownAlerts(), { timezone: 'Asia/Shanghai' })
+    );
+  }
+
   // 加密币快照（24/7 每5分钟）
   global.cryptoSnapshotJob = cron.schedule('*/5 * * * *', () => {
     takeCryptoSnapshot().catch(e => console.error('加密币快照失败:', e.message));

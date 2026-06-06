@@ -228,6 +228,10 @@ async function handleTradeRoutes(req, res, { userId, sendCachedJson, invalidateC
         user_id: userId,
       });
 
+      // 调整待投入资金：加仓减少，减仓增加
+      const cashDelta = isAdd ? -amount : shares * tradePrice;
+      await db.adjustCashReserve(userId, cashDelta);
+
       invalidateCache('trade-history', `trade-history:${rowId}`);
       sendJson(res, 200, { success: true, totalShares, newCost });
     } catch (e) {

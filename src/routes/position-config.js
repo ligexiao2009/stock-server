@@ -131,6 +131,40 @@ async function handlePositionConfigRoutes(req, res, { userId }) {
     return true;
   }
 
+  // GET /api/index-drawdown — 上证指数从近期高点跌幅
+  if (req.method === 'GET' && req.url === '/api/index-drawdown') {
+    try {
+      const shIndex = await fetch('https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=kline_day&param=sh000001,day,,,90,qfq')
+        .then(r => r.text())
+        .then(t => {
+          const json = t.includes('=') ? t.slice(t.indexOf('=') + 1).replace(/;$/, '').trim() : t;
+          const stockData = JSON.parse(json)?.data?.sh000001;
+          const d = (stockData?.qfqday || stockData?.day || []);
+          return d.map(item => ({ date: String(item[0]), close: parseFloat(item[2]) }));
+        })
+        .catch(() => []);
+      if (shIndex.length < 2) {
+        sendJson(res, 200, { drawdown: 0, high: 0, current: 0, highDate: '' });
+        return true;
+      }
+      let high = shIndex[0].close, highDate = shIndex[0].date;
+      for (const p of shIndex) {
+        if (p.close > high) { high = p.close; highDate = p.date; }
+      }
+      const current = shIndex[shIndex.length - 1].close;
+      const drawdown = ((high - current) / high * 100);
+      sendJson(res, 200, {
+        drawdown: Math.round(drawdown * 100) / 100,
+        high: Math.round(high * 100) / 100,
+        current,
+        highDate,
+      });
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
   return false;
 }
 

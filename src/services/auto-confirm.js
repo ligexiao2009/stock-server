@@ -61,6 +61,7 @@ async function autoConfirmPendingTrades(invalidateCache, invalidateCacheByPrefix
         isBefore15: trade.isBefore15, createdAt: trade.createdAt, localDate: tradeDateStr,
         user_id: trade.user_id,
       });
+      await db.adjustCashReserve(trade.user_id, redeemAmount);
     } else {
       const newShares = trade.amount / fundData.netValue;
       const totalShares = (row.shares || 0) + newShares;
@@ -79,6 +80,7 @@ async function autoConfirmPendingTrades(invalidateCache, invalidateCacheByPrefix
         isBefore15: trade.isBefore15, createdAt: trade.createdAt, localDate: tradeDateStr,
         user_id: trade.user_id,
       });
+      await db.adjustCashReserve(trade.user_id, -trade.amount);
     }
 
     await db.deletePendingTrade(trade.id);
