@@ -97,8 +97,7 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
           userId,
         });
 
-        // 建仓自动扣减对应现金
-        const cashAmount = rowData.shares * rowData.cost;
+        // 建仓自动扣减对应现金（cashAmount 已在上方声明）
         if (rowData.isFund) {
           await db.adjustAlipayCash(userId, -cashAmount);
           console.log(`[建仓] ${rowData.code} ${rowData.name} 基金扣减支付宝 ¥${cashAmount.toFixed(0)}`);
