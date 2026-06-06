@@ -60,12 +60,29 @@ async function checkIndexDrawdownAlerts() {
     if (lastDate === today) continue;
 
     if (actualDrawdown >= threshold) {
+      // 找到下一个待触发的分批计划
+      const plans = await db.getBatchPlans(userId);
+      const nextPlan = plans.find(p => p.status === 'pending' && Math.abs(p.triggerPct) <= actualDrawdown);
+      const planInfo = nextPlan
+        ? `\n下一笔: 第${nextPlan.sortOrder}笔 ¥${(nextPlan.amount/10000).toFixed(1)}万`
+        : '';
+
       const title = `📉 补仓信号触发: 上证跌 ${actualDrawdown.toFixed(1)}%`;
       const content = `上证指数从近期高点 ${index.high.toFixed(0)} 跌至 ${index.current.toFixed(0)}
 跌幅 ${index.drawdown.toFixed(2)}%，已达到你设定的 ${threshold}% 阈值
-目标仓位 ${row.target_pct}%，建议按计划分批加仓`;
+目标仓位 ${row.target_pct}%${planInfo}`;
 
       await sendWechatMessage(title, content);
+
+      // 标记对应分批计划为已触发
+      if (nextPlan) {
+        await db.query(
+          `UPDATE batch_plans SET status = 'triggered' WHERE id = $1`,
+          [nextPlan.id]
+        );
+        console.log(`用户 ${userId}: 第${nextPlan.sortOrder}笔已标记为触发`);
+      }
+
       lastAlertSent.set(userId, today);
       console.log(`用户 ${userId}: 已发送补仓通知`);
     } else {
