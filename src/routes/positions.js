@@ -51,9 +51,16 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
 
       const isOverseas = rowData.categoryId === 'us_stock';
       if (existingPosition) {
-        // 如果是0股清仓状态重新加仓，扣除现金
+        // 如果是0股清仓状态重新加仓，检查余额并扣除现金
         if (existingPosition.shares === 0 && rowData.shares > 0) {
+          const cfg = await db.getPositionConfig(userId);
           const cashAmount = rowData.shares * rowData.cost;
+          const available = rowData.isFund ? (cfg?.alipay_cash || 0) : (cfg?.ths_cash || 0);
+          if (available < cashAmount) {
+            const account = rowData.isFund ? '支付宝' : '同花顺';
+            sendJson(res, 400, { success: false, message: "\(account)余额不足，当前¥\(available.toFixed(0)) 需要¥\(cashAmount.toFixed(0))" });
+            return true;
+          }
           if (rowData.isFund) {
             await db.adjustAlipayCash(userId, -cashAmount);
             console.log(`[加仓-恢复] ${rowData.code} ${rowData.name} 基金扣减支付宝 ¥${cashAmount.toFixed(0)}`);
@@ -70,6 +77,16 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
           targetPrice: rowData.targetPrice || null, categoryId: rowData.categoryId || null,
         });
       } else {
+        // 检查余额是否足够
+        const cfg = await db.getPositionConfig(userId);
+        const cashAmount = rowData.shares * rowData.cost;
+        const available = rowData.isFund ? (cfg?.alipay_cash || 0) : (cfg?.ths_cash || 0);
+        if (available < cashAmount) {
+          const account = rowData.isFund ? '支付宝' : '同花顺';
+          sendJson(res, 400, { success: false, message: "\(account)余额不足，当前¥\(available.toFixed(0)) 需要¥\(cashAmount.toFixed(0))" });
+          return true;
+        }
+
         const newId = rowData.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);
         await db.createPosition({
           id: newId, code: rowData.code, name: rowData.name,
