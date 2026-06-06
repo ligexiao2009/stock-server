@@ -228,9 +228,10 @@ async function handleTradeRoutes(req, res, { userId, sendCachedJson, invalidateC
         user_id: userId,
       });
 
-      // 调整待投入资金：加仓减少，减仓增加
+      // 股票交易：扣除/增加同花顺现金
       const cashDelta = isAdd ? -amount : shares * tradePrice;
-      await db.adjustCashReserve(userId, cashDelta);
+      await db.adjustThsCash(userId, cashDelta);
+      console.log(`[${isAdd ? '加仓' : '减仓'}] ${code} 同花顺 ${isAdd ? '扣减' : '增加'} ¥${Math.abs(cashDelta).toFixed(0)}`);
 
       invalidateCache('trade-history', `trade-history:${rowId}`);
       sendJson(res, 200, { success: true, totalShares, newCost });

@@ -51,6 +51,17 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
 
       const isOverseas = rowData.categoryId === 'us_stock';
       if (existingPosition) {
+        // 如果是0股清仓状态重新加仓，扣除现金
+        if (existingPosition.shares === 0 && rowData.shares > 0) {
+          const cashAmount = rowData.shares * rowData.cost;
+          if (rowData.isFund) {
+            await db.adjustAlipayCash(userId, -cashAmount);
+            console.log(`[加仓-恢复] ${rowData.code} ${rowData.name} 基金扣减支付宝 ¥${cashAmount.toFixed(0)}`);
+          } else {
+            await db.adjustThsCash(userId, -cashAmount);
+            console.log(`[加仓-恢复] ${rowData.code} ${rowData.name} 股票扣减同花顺 ¥${cashAmount.toFixed(0)}`);
+          }
+        }
         await db.updatePosition(existingPosition.id, {
           code: rowData.code, name: rowData.name,
           shares: rowData.shares, cost: rowData.cost,
@@ -68,6 +79,16 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
           targetPrice: rowData.targetPrice || null, categoryId: rowData.categoryId || null,
           userId,
         });
+
+        // 建仓自动扣减对应现金
+        const cashAmount = rowData.shares * rowData.cost;
+        if (rowData.isFund) {
+          await db.adjustAlipayCash(userId, -cashAmount);
+          console.log(`[建仓] ${rowData.code} ${rowData.name} 基金扣减支付宝 ¥${cashAmount.toFixed(0)}`);
+        } else {
+          await db.adjustThsCash(userId, -cashAmount);
+          console.log(`[建仓] ${rowData.code} ${rowData.name} 股票扣减同花顺 ¥${cashAmount.toFixed(0)}`);
+        }
 
         // 建仓自动创建一条交易记录
         const now = new Date();
@@ -104,21 +125,27 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
   if (req.method === 'POST' && req.url === '/api/delete-row') {
     try {
       const { id, code, isFund } = await readJsonBody(req);
-      let deleted = false;
+      let posToDelete = null;
+      if (id) posToDelete = await db.getPosition(id);
+      if (!posToDelete && code && isFund !== undefined) posToDelete = await db.getPositionByCode(code, isFund, userId);
+      if (!posToDelete) { sendJson(res, 404, { error: '持仓不存在' }); return true; }
 
-      if (code && isFund !== undefined) {
-        try { await db.deletePositionByCode(code, isFund); deleted = true; } catch (_) {}
-      }
-      if (!deleted && id) {
-        try { await db.deletePosition(id); deleted = true; } catch (_) {}
+      await db.deletePosition(posToDelete.id);
+
+      // 删除后退还现金
+      const refundAmount = posToDelete.shares * posToDelete.cost;
+      if (posToDelete.isFund) {
+        await db.adjustAlipayCash(userId, refundAmount);
+        console.log(`[清仓] ${posToDelete.code} ${posToDelete.name} 基金退还支付宝 ¥${refundAmount.toFixed(0)}`);
+      } else {
+        await db.adjustThsCash(userId, refundAmount);
+        console.log(`[清仓] ${posToDelete.code} ${posToDelete.name} 股票退还同花顺 ¥${refundAmount.toFixed(0)}`);
       }
 
-      if (deleted) {
-        invalidateCache('data');
-        invalidateCacheByPrefix('quotes:');
-      }
+      invalidateCache('data');
+      invalidateCacheByPrefix('quotes:');
 
-      sendJson(res, 200, { success: true, deleted });
+      sendJson(res, 200, { success: true });
     } catch (e) {
       console.error('Delete row error:', e);
       sendJson(res, 400, { success: false, message: e.message });

@@ -61,7 +61,8 @@ async function autoConfirmPendingTrades(invalidateCache, invalidateCacheByPrefix
         isBefore15: trade.isBefore15, createdAt: trade.createdAt, localDate: tradeDateStr,
         user_id: trade.user_id,
       });
-      await db.adjustCashReserve(trade.user_id, redeemAmount);
+      await db.adjustAlipayCash(trade.user_id, redeemAmount);
+      console.log(`[基金赎回] ${trade.code} 支付宝增加 ¥${redeemAmount.toFixed(0)}`);
     } else {
       const newShares = trade.amount / fundData.netValue;
       const totalShares = (row.shares || 0) + newShares;
@@ -80,7 +81,8 @@ async function autoConfirmPendingTrades(invalidateCache, invalidateCacheByPrefix
         isBefore15: trade.isBefore15, createdAt: trade.createdAt, localDate: tradeDateStr,
         user_id: trade.user_id,
       });
-      await db.adjustCashReserve(trade.user_id, -trade.amount);
+      await db.adjustAlipayCash(trade.user_id, -trade.amount);
+      console.log(`[基金加仓] ${trade.code} 支付宝扣减 ¥${trade.amount.toFixed(0)}`);
     }
 
     await db.deletePendingTrade(trade.id);

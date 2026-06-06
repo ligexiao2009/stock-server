@@ -711,6 +711,9 @@ async function getPositionConfig(userId) {
   return {
     target_pct: parseInt(row.target_pct) || 80,
     cash_reserve: parseFloat(row.cash_reserve) || 0,
+    alipay_cash: parseFloat(row.alipay_cash) || 0,
+    ths_cash: parseFloat(row.ths_cash) || 0,
+    bank_cash: parseFloat(row.bank_cash) || 0,
     batch_count: parseInt(row.batch_count) || 4,
     signal_enabled: row.signal_enabled === true || row.signal_enabled === 'true',
     signal_pct: parseFloat(row.signal_pct) || -10,
@@ -718,18 +721,21 @@ async function getPositionConfig(userId) {
 }
 
 async function savePositionConfig(userId, data) {
-  const { targetPct, cashReserve, batchCount, signalEnabled, signalPct } = data;
+  const { targetPct, cashReserve, alipayCash, thsCash, bankCash, batchCount, signalEnabled, signalPct } = data;
   await query(
-    `INSERT INTO position_config (user_id, target_pct, cash_reserve, batch_count, signal_enabled, signal_pct, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    `INSERT INTO position_config (user_id, target_pct, cash_reserve, alipay_cash, ths_cash, bank_cash, batch_count, signal_enabled, signal_pct, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
      ON CONFLICT (user_id) DO UPDATE SET
        target_pct = EXCLUDED.target_pct,
        cash_reserve = EXCLUDED.cash_reserve,
+       alipay_cash = EXCLUDED.alipay_cash,
+       ths_cash = EXCLUDED.ths_cash,
+       bank_cash = EXCLUDED.bank_cash,
        batch_count = EXCLUDED.batch_count,
        signal_enabled = EXCLUDED.signal_enabled,
        signal_pct = EXCLUDED.signal_pct,
        updated_at = NOW()`,
-    [userId || 'default', targetPct ?? 80, cashReserve ?? 0, batchCount ?? 4, signalEnabled ?? false, signalPct ?? -10]
+    [userId || 'default', targetPct ?? 80, cashReserve ?? 0, alipayCash ?? 0, thsCash ?? 0, bankCash ?? 0, batchCount ?? 4, signalEnabled ?? false, signalPct ?? -10]
   );
 }
 
@@ -737,6 +743,29 @@ async function adjustCashReserve(userId, delta) {
   await query(
     `UPDATE position_config SET cash_reserve = GREATEST(0, cash_reserve + $1), updated_at = NOW() WHERE user_id = $2`,
     [delta, userId || 'default']
+  );
+}
+
+async function adjustAlipayCash(userId, delta) {
+  await query(
+    `UPDATE position_config SET alipay_cash = GREATEST(0, alipay_cash + $1), updated_at = NOW() WHERE user_id = $2`,
+    [delta, userId || 'default']
+  );
+  await syncTotalCash(userId);
+}
+
+async function adjustThsCash(userId, delta) {
+  await query(
+    `UPDATE position_config SET ths_cash = GREATEST(0, ths_cash + $1), updated_at = NOW() WHERE user_id = $2`,
+    [delta, userId || 'default']
+  );
+  await syncTotalCash(userId);
+}
+
+async function syncTotalCash(userId) {
+  await query(
+    `UPDATE position_config SET cash_reserve = alipay_cash + ths_cash + bank_cash, updated_at = NOW() WHERE user_id = $1`,
+    [userId || 'default']
   );
 }
 
@@ -845,6 +874,9 @@ module.exports = {
   getPositionConfig,
   savePositionConfig,
   adjustCashReserve,
+  adjustAlipayCash,
+  adjustThsCash,
+  syncTotalCash,
   getBatchPlans,
   saveBatchPlans,
 
