@@ -265,6 +265,18 @@ const server = http.createServer(async (req, res) => {
   if (await handleAssetRoutes(req, res, { userId, sendCachedJson, invalidateCache })) return;
   if (await handleDailyProfitRoutes(req, res, userId)) return;
 
+  // 触发当前用户资产快照（保存仓位配置后调用）
+  if (req.method === 'POST' && req.url === '/api/asset-snapshot' && userId) {
+    try {
+      await takeAssetSnapshot(userId);
+      res.writeHead(200).end(JSON.stringify({ success: true }));
+    } catch (e) {
+      console.error('[资产快照] 手动触发失败:', e.message);
+      res.writeHead(500).end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // 盘中收益快照
   if (req.method === 'GET' && req.url.startsWith('/api/intraday-snapshots')) {
     const urlObj = new URL(req.url, `http://${req.headers.host}`);

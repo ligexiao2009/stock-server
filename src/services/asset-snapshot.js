@@ -13,11 +13,13 @@ const { fetchQuotesBatch } = require('../utils/quotes');
 
 const CRYPTO_CODES = new Set(['BTC', 'ETH', 'OKB']);
 
-async function takeAssetSnapshot() {
+async function takeAssetSnapshot(userId = null) {
   console.log('\n========== 资产快照 ==========');
 
-  // 1. 获取所有用户的 position_config
-  const allConfigs = await db.query('SELECT * FROM position_config');
+  // 1. 获取 position_config（指定用户或全部）
+  const allConfigs = userId
+    ? await db.query('SELECT * FROM position_config WHERE user_id = $1', [userId])
+    : await db.query('SELECT * FROM position_config');
   const configs = (allConfigs && allConfigs.rows) ? allConfigs.rows : [];
   if (configs.length === 0) {
     console.log('[资产快照] 无 position_config，跳过');
