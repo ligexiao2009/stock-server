@@ -29,6 +29,7 @@ const { checkFundsAndAlert } = require('./services/fund-alert');
 const { calculateAndSaveDailyProfit } = require('./services/daily-profit');
 const { autoConfirmPendingTrades } = require('./services/auto-confirm');
 const { sendWechatMessage, initServerchanKey } = require('./services/wechat');
+const { takeAssetSnapshot } = require('./services/asset-snapshot');
 const { takeSnapshot } = require('./services/intraday-snapshot');
 const { takeCryptoSnapshot } = require('./services/crypto-snapshot');
 
@@ -81,7 +82,7 @@ async function setupCronJob() {
   const cronTime = process.env.ALERT_TIME || configs.alertTime || '0 22 * * *';
 
   // 清理旧任务
-  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'nightSnapshotJob', 'cryptoSnapshotJob', 'snapshotBackupJob']
+  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'nightSnapshotJob', 'cryptoSnapshotJob', 'snapshotBackupJob', 'aiAnalysisJob', 'assetSnapshotJob']
     .forEach(k => { if (global[k]) { if (Array.isArray(global[k])) global[k].forEach(j => j.stop()); else global[k].stop(); } });
 
   // 基金提醒
@@ -181,6 +182,11 @@ async function setupCronJob() {
     }
   }, { timezone: 'Asia/Shanghai' });
 
+  // 资产快照（工作日 23:30，自动记录总资产）
+  global.assetSnapshotJob = cron.schedule('30 23 * * 1-5', () => {
+    takeAssetSnapshot().catch(e => console.error('[资产快照] 失败:', e.message));
+  }, { timezone: 'Asia/Shanghai' });
+
   // 每天 00:05 清理 7 天前的快照数据
   global.snapshotCleanupJob = cron.schedule('5 0 * * *', async () => {
     try {
@@ -207,7 +213,7 @@ async function setupCronJob() {
     }
   }, { timezone: 'Asia/Shanghai' });
 
-  console.log(`定时任务已设置: 基金提醒 ${cronTime}, AI批量分析 工作日15:20, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每5分钟, 港股收盘 16:10, 晚间 23:30, 加密币 24/7每5分钟, 快照清理 每天00:05`);
+  console.log(`定时任务已设置: 基金提醒 ${cronTime}, AI批量分析 工作日15:20, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每5分钟, 港股收盘 16:10, 资产快照 工作日23:30, 加密币 24/7每5分钟, 快照清理 每天00:05`);
 }
 
 // ==================== 启动服务器 ====================
