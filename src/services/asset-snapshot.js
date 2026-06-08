@@ -23,10 +23,9 @@ async function takeAssetSnapshot() {
     return;
   }
 
-  const userId = 'default';
-
-  // 1. 获取 position_config
-  const posConfig = (await db.getPositionConfig(userId)) || {};
+  // 1. 获取 position_config（取第一条，不限 user_id）
+  const allConfigs = await db.query('SELECT * FROM position_config LIMIT 1');
+  const posConfig = (allConfigs && allConfigs.rows && allConfigs.rows.length > 0) ? allConfigs.rows[0] : {};
   const thsCash = parseFloat(posConfig.ths_cash) || 0;
   const alipayCash = parseFloat(posConfig.alipay_cash) || 0;
   const bankCash = parseFloat(posConfig.bank_cash) || 0;
@@ -66,8 +65,8 @@ async function takeAssetSnapshot() {
   stockMv = Math.round(stockMv * 100) / 100;
   fundMv = Math.round(fundMv * 100) / 100;
 
-  // 4. 获取最新一条 asset_record，继承静态字段
-  const latestRecords = await db.getAssetRecords(userId);
+  // 4. 获取最新一条 asset_record，继承静态字段（不限 user_id）
+  const latestRecords = await db.getAssetRecords(null);
   const latest = (latestRecords && latestRecords.length > 0) ? latestRecords[0] : {};
 
   const wechat = parseFloat(latest.wechat) || 0;
@@ -91,10 +90,11 @@ async function takeAssetSnapshot() {
   const pad = n => String(n).padStart(2, '0');
   const recordedAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
-  // 7. 写入
+  // 7. 写入（沿用最新记录的 user_id）
+  const snapUserId = latest.userId || latest.user_id || posConfig.user_id || 'default';
   await db.createAssetRecord({
     recordedAt,
-    userId,
+    userId: snapUserId,
     total,
     alipay,
     wechat,
