@@ -39,6 +39,7 @@ async function takeAssetSnapshot() {
 
   // 4. 获取汇率
   const usdRate = parseFloat(await db.getConfig('crypto_fx')) || 7.25;
+  const hkdRate = parseFloat(await db.getConfig('hkd_cny_rate')) || 0.93;
 
   // 5. 每个用户单独处理
   for (const cfg of configs) {
@@ -67,7 +68,9 @@ async function takeAssetSnapshot() {
       const key = `${p.code}:${isFund ? 1 : 0}`;
       const q = quotes[key];
       if (!q || !q.price || !p.shares) continue;
-      const mv = q.price * p.shares;
+      let price = q.price;
+      if (p.code.length === 5 && !isFund) { price *= hkdRate; } // 港股 HKD→CNY
+      const mv = price * p.shares;
       if (isFund) { fundMv += mv; } else { stockMv += mv; }
     }
     stockMv = Math.round(stockMv * 100) / 100;
