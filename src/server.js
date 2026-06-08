@@ -85,9 +85,9 @@ async function setupCronJob() {
   ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'nightSnapshotJob', 'cryptoSnapshotJob', 'snapshotBackupJob', 'aiAnalysisJob', 'assetSnapshotJob']
     .forEach(k => { if (global[k]) { if (Array.isArray(global[k])) global[k].forEach(j => j.stop()); else global[k].stop(); } });
 
-  // 基金提醒
-  global.cronJob = cron.schedule(cronTime, () => checkFundsAndAlert(),
-    { timezone: 'Asia/Shanghai' });
+  // 基金提醒（暂时关闭微信推送）
+  // global.cronJob = cron.schedule(cronTime, () => checkFundsAndAlert(),
+  //   { timezone: 'Asia/Shanghai' });
 
   // 每日收益（周一到周五 23:00）
   // 每天 20:00/21:00/22:00/23:00 各执行一次，净值更新后尽快记录
