@@ -116,8 +116,8 @@ async function setupCronJob() {
     db.resetAlertRulesDaily();
   }, { timezone: 'Asia/Shanghai' });
 
-  // 盘中收益快照（交易时间每2分钟，覆盖A股+港股，16:15后停止）
-  global.intradaySnapshotJob = cron.schedule('*/2 9-16 * * 1-5', () => {
+  // 盘中收益快照（交易时间每1分钟，覆盖A股+港股，16:15后停止）
+  global.intradaySnapshotJob = cron.schedule('* 9-16 * * 1-5', () => {
     const now = new Date();
     const h = now.getHours(), m = now.getMinutes();
     if (h > 16 || (h === 16 && m > 15)) return;
@@ -213,7 +213,7 @@ async function setupCronJob() {
     }
   }, { timezone: 'Asia/Shanghai' });
 
-  console.log(`定时任务已设置: 基金提醒 ${cronTime}, AI批量分析 工作日15:20, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每2分钟, 港股收盘 16:10, 资产快照 工作日23:30, 加密币 24/7每5分钟, 快照清理 每天00:05`);
+  console.log(`定时任务已设置: 基金提醒 ${cronTime}, AI批量分析 工作日15:20, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每1分钟, 港股收盘 16:10, 资产快照 工作日23:30, 加密币 24/7每5分钟, 快照清理 每天00:05`);
 }
 
 // ==================== 启动服务器 ====================
