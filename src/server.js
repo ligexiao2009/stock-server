@@ -82,7 +82,7 @@ async function setupCronJob() {
   const cronTime = process.env.ALERT_TIME || configs.alertTime || '0 22 * * *';
 
   // 清理旧任务
-  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'nightSnapshotJob', 'cryptoSnapshotJob', 'snapshotBackupJob', 'aiAnalysisJob', 'assetSnapshotJob']
+  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'cryptoSnapshotJob', 'snapshotBackupJob', 'aiAnalysisJob', 'assetSnapshotJob']
     .forEach(k => { if (global[k]) { if (Array.isArray(global[k])) global[k].forEach(j => j.stop()); else global[k].stop(); } });
 
   // 基金提醒（暂时关闭微信推送）
@@ -130,10 +130,6 @@ async function setupCronJob() {
   }, { timezone: 'Asia/Shanghai' });
 
   // 晚间最终快照（23:30，等基金净值更新完）
-  global.nightSnapshotJob = cron.schedule('30 23 * * 1-5', () => {
-    takeSnapshot().catch(e => console.error('晚间快照失败:', e.message));
-  }, { timezone: 'Asia/Shanghai' });
-
   // 补仓信号检测（工作日 09:30 + 14:00）
   if (process.env.SERVERCHAN_KEY) {
     const { checkIndexDrawdownAlerts } = require('./services/index-alert');
