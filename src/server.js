@@ -129,11 +129,10 @@ async function setupCronJob() {
     takeSnapshot().catch(e => console.error('港股收盘快照失败:', e.message));
   }, { timezone: 'Asia/Shanghai' });
 
-  // 晚间最终快照（23:30，等基金净值更新完）
-  // 补仓信号检测（工作日 09:30 + 14:00）
+  // 补仓信号检测（工作日 10:00 + 14:30）
   if (process.env.SERVERCHAN_KEY) {
     const { checkIndexDrawdownAlerts } = require('./services/index-alert');
-    ['30 9 * * 1-5', '0 15 * * 1-5'].forEach(t =>
+    ['0 10 * * 1-5', '30 14 * * 1-5'].forEach(t =>
       cron.schedule(t, () => checkIndexDrawdownAlerts(), { timezone: 'Asia/Shanghai' })
     );
   }
