@@ -66,6 +66,8 @@ async function fetchQuotesBatch(items, opts = {}) {
   for (const item of items || []) {
     const code = String(item.code || '').trim();
     if (!code) continue;
+    // 加密币走独立行情（Gate.io），不查腾讯/TickFlow
+    if (['BTC','ETH','OKB'].includes(code.toUpperCase())) continue;
     const isFund = item.isFund === true || item.isFund === 'true' || item.isFund === 1 || item.isFund === '1';
     const cacheKey = `${code}:${isFund ? 1 : 0}`;
     if (seen.has(cacheKey)) continue;

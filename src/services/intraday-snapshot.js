@@ -79,12 +79,13 @@ async function takeSnapshot() {
   const alertItems = [];
 
   for (const [userId, rows] of Object.entries(userMap)) {
-    const stocks = rows.filter(r => !r.isFund && r.code);
+    const cryptoSet = new Set(['BTC', 'ETH', 'OKB']);
+    const stocks = rows.filter(r => !r.isFund && r.code && !cryptoSet.has(r.code.toUpperCase()));
     const funds = rows.filter(r => r.isFund && r.code);
     console.log(`\n用户 ${userId}: 股票=${stocks.length}只 基金=${funds.length}只`);
 
-    // 批量获取行情
-    const specs = rows.map(r => ({ code: r.code, isFund: r.isFund }));
+    // 批量获取行情（跳过加密币，加密币有独立快照）
+    const specs = rows.filter(r => !cryptoSet.has(r.code.toUpperCase())).map(r => ({ code: r.code, isFund: r.isFund }));
     const quotes = await fetchQuotesBatch(specs, { skipCache: true });
     setHKQuoteCache(quotes);
 
