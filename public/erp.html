@@ -2,621 +2,386 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#F4F6FB" id="themeColorMeta">
-    <title>ERP 风险溢价 - 投资助手</title>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP 风险溢价 Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
-        :root {
-            --bg-color: #F4F6FB;
-            --bg-accent: radial-gradient(circle at top left, rgba(66, 153, 225, 0.16), transparent 32%), radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 26%);
-            --card-bg: rgba(255, 255, 255, 0.92);
-            --text-main: #111827;
-            --text-secondary: #667085;
-            --text-tertiary: #B8C0CC;
-            --primary-blue: #247CFF;
-            --ios-sep: rgba(148, 163, 184, 0.22);
-            --stroke-soft: rgba(148, 163, 184, 0.18);
-            --shadow-soft: 0 14px 32px rgba(15, 23, 42, 0.06);
-            --green: #10B981;
-            --red: #EF4444;
-            --yellow: #F59E0B;
-        }
-
-        :root[data-theme='dark'] {
-            --bg-color: #07111F;
-            --bg-accent: radial-gradient(circle at top left, rgba(37, 99, 235, 0.24), transparent 30%), radial-gradient(circle at top right, rgba(8, 145, 178, 0.18), transparent 24%);
-            --card-bg: rgba(15, 23, 42, 0.86);
-            --text-main: #F8FAFC;
-            --text-secondary: #94A3B8;
-            --text-tertiary: #475569;
-            --primary-blue: #60A5FA;
-            --ios-sep: rgba(71, 85, 105, 0.45);
-            --stroke-soft: rgba(71, 85, 105, 0.32);
-            --shadow-soft: 0 18px 40px rgba(2, 8, 23, 0.34);
-            --green: #34D399;
-            --red: #F87171;
-            --yellow: #FBBF24;
-        }
-
-        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; -webkit-user-select: none; }
-
-        html, body {
-            overscroll-behavior-y: none;
-            background-color: var(--bg-color);
-            margin: 0; padding: 0;
-        }
-
-        html[data-theme='light'] { color-scheme: light; background-color: #F4F6FB; }
-        html[data-theme='dark'] { color-scheme: dark; background-color: #07111F; }
-
-        body {
-            font-family: -apple-system, "SF Pro Display", "SF Pro Text", "PingFang SC", sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            background-image: var(--bg-accent);
-            background-attachment: fixed;
-            padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
-            transition: background-color 0.35s ease, color 0.35s ease;
-        }
-
-        .container { width: 100%; max-width: 1200px; }
-
-        .header {
-            display: flex; align-items: center; gap: 16px;
-            padding: 20px 0 12px;
-        }
-        .back-btn {
-            width: 36px; height: 36px; border-radius: 50%;
-            background: var(--card-bg);
-            border: 1px solid var(--stroke-soft);
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 18px; color: var(--text-main);
-            text-decoration: none; transition: transform 0.2s ease;
-        }
-        .back-btn:active { transform: scale(0.9); }
-        .header-title { font-size: 22px; font-weight: 800; color: var(--text-main); letter-spacing: -0.5px; }
-
-        /* KPI 卡片 */
-        .kpi-row {
-            display: flex; gap: 10px; margin-bottom: 14px;
-        }
-        .kpi-card {
-            flex: 1; background: var(--card-bg);
-            border-radius: 16px; padding: 14px 12px;
-            border: 1px solid var(--stroke-soft);
-            box-shadow: var(--shadow-soft);
-            text-align: center;
-        }
-        .kpi-label { font-size: 11px; color: var(--text-secondary); font-weight: 600; letter-spacing: 0.06em; margin-bottom: 4px; }
-        .kpi-value { font-size: 22px; font-weight: 800; color: var(--text-main); letter-spacing: -0.5px; }
-        .kpi-sub { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
-
-        .kpi-pe .kpi-value { color: var(--green); }
-        .kpi-bond .kpi-value { color: var(--red); }
-        .kpi-erp .kpi-value { color: var(--primary-blue); }
-        .kpi-erp.positive .kpi-value { color: var(--green); }
-        .kpi-erp.negative .kpi-value { color: var(--red); }
-
-        /* 图表 */
-        /* 日期筛选按钮 */
-        .filter-row {
-            display: flex; gap: 8px; flex-wrap: wrap;
-            margin-bottom: 14px;
-        }
-        .filter-btn {
-            padding: 6px 14px; border-radius: 999px;
-            border: 1px solid var(--stroke-soft);
-            background: var(--card-bg); color: var(--text-secondary);
-            font-size: 12px; font-weight: 600; cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .filter-btn:active { transform: scale(0.96); }
-        .filter-btn.active {
-            background: var(--primary-blue); color: #fff;
-            border-color: var(--primary-blue);
-        }
-
-        .chart-card {
-            background: var(--card-bg);
-            border-radius: 16px; padding: 12px 8px 8px;
-            border: 1px solid var(--stroke-soft);
-            box-shadow: var(--shadow-soft);
-            margin-bottom: 14px;
-        }
-        .chart-title {
-            font-size: 14px; font-weight: 700; color: var(--text-main);
-            padding: 0 8px 4px;
-        }
-        .chart-wrap { width: 100%; height: 460px; }
-
-        .chart-wrap-sm { height: 320px; }
-
-        /* 解读 */
-        .insight-card {
-            background: var(--card-bg);
-            border-radius: 16px; padding: 14px 16px;
-            border: 1px solid var(--stroke-soft);
-            box-shadow: var(--shadow-soft);
-            margin-bottom: 24px;
-        }
-        .insight-title { font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 8px; }
-        .insight-text { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
-
-        /* Loading */
-        .loading {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 60px 0; color: var(--text-secondary); font-size: 13px;
-        }
-        .spinner {
-            width: 32px; height: 32px; border: 3px solid var(--stroke-soft);
-            border-top-color: var(--primary-blue); border-radius: 50%;
-            animation: spin 0.8s linear infinite; margin-bottom: 12px;
-        }
+        body { background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif; }
+        .glass-card { background: #ffffff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.02); border: 1px solid #f1f5f9; }
+        .icon-box { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .bg-blue-soft { background-color: #eff6ff; color: #3b82f6; }
+        .bg-green-soft { background-color: #f0fdf4; color: #22c55e; }
+        .bg-red-soft { background-color: #fef2f2; color: #ef4444; }
+        .bg-indigo-soft { background-color: #e0e7ff; color: #6366f1; }
+        .bg-orange-soft { background-color: #fff7ed; color: #f97316; }
+        .filter-btn { transition: all 0.2s; }
+        .filter-btn.active { background-color: #3b82f6 !important; color: #fff !important; border-color: #3b82f6 !important; }
+        .spinner { width: 32px; height: 32px; border: 3px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Theme btn */
-        .header-right { margin-left: auto; }
-        .theme-btn {
-            width: 36px; height: 36px; border-radius: 50%;
-            background: var(--card-bg); border: 1px solid var(--stroke-soft);
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: transform 0.2s ease;
-        }
-        .theme-btn:active { transform: scale(0.9); }
-        .theme-btn svg { width: 16px; height: 16px; stroke: var(--text-main); stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-
-        .footer-note {
-            text-align: center; color: var(--text-secondary); font-size: 11px; padding: 0 20px 20px;
-        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <a href="index.html" class="back-btn">←</a>
-            <span class="header-title">ERP 风险溢价</span>
-            <div class="header-right">
-                <div class="theme-btn" onclick="toggleTheme()" id="themeBtn">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2.5M12 19v2.5M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M2.5 12H5M19 12h2.5M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"></path></svg>
-                </div>
-            </div>
+<body class="p-6 md:p-8 text-gray-800">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+        <div class="flex items-center space-x-4">
+            <a href="index.html" class="p-2 rounded-full hover:bg-gray-200 transition">
+                <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            </a>
+            <h1 class="text-2xl font-bold tracking-tight">ERP 风险溢价</h1>
         </div>
-
-        <div id="indicators" class="kpi-row">
-            <div class="kpi-card kpi-index"><div class="kpi-label">沪深300</div><div class="kpi-value">--</div><div class="kpi-sub">指数点位</div></div>
-            <div class="kpi-card kpi-pe"><div class="kpi-label">PE</div><div class="kpi-value">--</div><div class="kpi-sub">TTM 市盈率</div></div>
-            <div class="kpi-card kpi-bond"><div class="kpi-label">十年期国债</div><div class="kpi-value">--%</div><div class="kpi-sub">到期收益率</div></div>
-            <div class="kpi-card kpi-erp"><div class="kpi-label">ERP</div><div class="kpi-value">--%</div><div class="kpi-sub">E/P − 国债</div></div>
-        </div>
-
-        <div id="loadingEl" class="loading">
-            <div class="spinner"></div>
-            <span>正在加载数据...</span>
-        </div>
-
-        <div id="mainContent" style="display:none;">
-            <div class="filter-row">
-                <button class="filter-btn active" data-range="0">全部</button>
-                <button class="filter-btn" data-range="1">近 1 年</button>
-                <button class="filter-btn" data-range="2">近 2 年</button>
-                <button class="filter-btn" data-range="3">近 3 年</button>
-                <button class="filter-btn" data-range="5">近 5 年</button>
-                <button class="filter-btn" data-range="10">近 10 年</button>
-            </div>
-
-            <div class="chart-card">
-                <div class="chart-title">📈 ERP 风险溢价 + 沪深300 指数</div>
-                <div class="chart-wrap" id="erpChart"></div>
-            </div>
-
-            <div class="chart-card">
-                <div class="chart-title">📊 市盈率 vs 国债收益率</div>
-                <div class="chart-wrap chart-wrap-sm" id="peBondChart"></div>
-            </div>
-
-            <div class="filter-row">
-                <button class="filter-btn turnover-filter active" data-range="0">全部</button>
-                <button class="filter-btn turnover-filter" data-range="1">近 1 年</button>
-                <button class="filter-btn turnover-filter" data-range="2">近 2 年</button>
-                <button class="filter-btn turnover-filter" data-range="3">近 3 年</button>
-                <button class="filter-btn turnover-filter" data-range="5">近 5 年</button>
-            </div>
-
-            <div class="chart-card">
-                <div class="chart-title">💰 A股成交额 + 上证指数</div>
-                <div class="chart-wrap" id="turnoverChart"></div>
-            </div>
-
-            <div class="insight-card" id="insightCard">
-                <div class="insight-title">💡 当前解读</div>
-                <div class="insight-text" id="insightText"></div>
-            </div>
-        </div>
-
-        <p class="footer-note">ERP = 1/PE − 10年期国债收益率  |  成交额为新浪成交量估算(±10%误差)<br>数据来源：乐股乐股 · 中国10年期国债 · 新浪财经</p>
     </div>
 
-    <script>
-        const html = document.documentElement;
-        const themeBtn = document.getElementById('themeBtn');
-        const sunIcon = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2.5M12 19v2.5M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M2.5 12H5M19 12h2.5M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"></path></svg>';
-        const moonIcon = '<svg viewBox="0 0 24 24"><path d="M20 15.2A7.9 7.9 0 0 1 8.8 4 8.8 8.8 0 1 0 20 15.2z"></path></svg>';
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-6">
+        <div class="glass-card p-5 flex items-center space-x-4">
+            <div class="icon-box bg-blue-soft">📈</div>
+            <div>
+                <div class="text-gray-500 text-sm mb-1">沪深300</div>
+                <div class="text-2xl font-extrabold text-gray-900" id="kpiIndex">--</div>
+                <div class="text-gray-400 text-xs mt-1">指数点位</div>
+            </div>
+        </div>
+        <div class="glass-card p-5 flex items-center space-x-4">
+            <div class="icon-box bg-green-soft">PE</div>
+            <div>
+                <div class="text-gray-500 text-sm mb-1">PE (TTM)</div>
+                <div class="text-2xl font-extrabold text-green-500" id="kpiPE">--</div>
+                <div class="text-gray-400 text-xs mt-1">市场市盈率</div>
+            </div>
+        </div>
+        <div class="glass-card p-5 flex items-center space-x-4">
+            <div class="icon-box bg-red-soft">📄</div>
+            <div>
+                <div class="text-gray-500 text-sm mb-1">十年期国债</div>
+                <div class="text-2xl font-extrabold text-red-500" id="kpiBond">--</div>
+                <div class="text-gray-400 text-xs mt-1">到期收益率</div>
+            </div>
+        </div>
+        <div class="glass-card p-5 flex items-center space-x-4">
+            <div class="icon-box bg-indigo-soft">🛡️</div>
+            <div>
+                <div class="text-gray-500 text-sm mb-1">ERP 风险溢价</div>
+                <div class="text-2xl font-extrabold text-indigo-600" id="kpiERP">--</div>
+                <div class="text-gray-400 text-xs mt-1">E/P − 国债</div>
+            </div>
+        </div>
+        <div id="kpiTurnover" class="glass-card p-5 flex items-center space-x-4">
+            <div class="icon-box bg-orange-soft">💰</div>
+            <div>
+                <div class="text-gray-500 text-sm mb-1">今日成交额</div>
+                <div class="text-2xl font-extrabold text-orange-500" id="kpiTurnoverVal">--</div>
+                <div class="text-gray-400 text-xs mt-1">沪深两市合计</div>
+            </div>
+        </div>
+    </div>
 
-        function updateThemeUI(theme) {
-            html.setAttribute('data-theme', theme);
-            document.getElementById('themeColorMeta').setAttribute('content', theme === 'dark' ? '#07111F' : '#F4F6FB');
-            html.style.backgroundColor = theme === 'dark' ? '#07111F' : '#F4F6FB';
-            themeBtn.innerHTML = theme === 'dark' ? sunIcon : moonIcon;
-        }
+    <!-- Filter Buttons -->
+    <div class="flex flex-wrap justify-between items-center mb-4">
+        <div class="flex space-x-2 bg-white rounded-full p-1 shadow-sm border border-gray-100">
+            <button class="filter-btn px-5 py-1.5 rounded-full bg-blue-600 text-white text-sm font-medium active" data-range="0">全部</button>
+            <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition" data-range="1">近 1 年</button>
+            <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition" data-range="2">近 2 年</button>
+            <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition" data-range="3">近 3 年</button>
+            <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition" data-range="5">近 5 年</button>
+            <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition" data-range="10">近 10 年</button>
+        </div>
+        <div id="dateRange" class="flex items-center space-x-3 mt-4 md:mt-0">
+            <div class="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm flex items-center shadow-sm">
+                <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                <span id="dateRangeText">--</span>
+            </div>
+        </div>
+    </div>
 
-        function toggleTheme() {
-            const t = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-            updateThemeUI(t);
-            localStorage.setItem('theme', t);
-            // 刷新图表主题
-            if (window._erpChart) { window._erpChart.dispose(); initERPChart(); }
-            if (window._peBondChart) { window._peBondChart.dispose(); initPEBondChart(); }
-            if (window._turnoverChart) { window._turnoverChart.dispose(); initTurnoverChart(); }
-        }
+    <!-- Main Chart -->
+    <div class="glass-card p-6 mb-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold flex items-center text-gray-800">
+                <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                ERP 风险溢价 + 沪深300 指数
+            </h2>
+            <div class="flex items-center space-x-4 text-sm text-gray-600">
+                <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 mr-2"></span>ERP 风险溢价 (左轴)</span>
+                <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-orange-500 mr-2"></span>沪深300 指数 (右轴)</span>
+            </div>
+        </div>
+        <div id="erpChart" style="width: 100%; height: 480px;"></div>
+    </div>
 
-        // 初始化主题
-        const saved = localStorage.getItem('theme');
-        const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        updateThemeUI(saved || (sysDark ? 'dark' : 'light'));
+    <!-- PE vs Bond Chart -->
+    <div class="glass-card p-6 mb-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-800">市盈率 vs 国债收益率</h2>
+            <div class="flex items-center space-x-4 text-sm text-gray-600">
+                <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-green-500 mr-2"></span>PE (左轴)</span>
+                <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-red-500 mr-2"></span>十年期国债 (右轴)</span>
+            </div>
+        </div>
+        <div id="peBondChart" style="width: 100%; height: 320px;"></div>
+    </div>
 
-        function isDark() { return html.getAttribute('data-theme') === 'dark'; }
+    <!-- Turnover Chart -->
+    <div class="glass-card p-6 mb-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-800">A股成交额 + 上证指数</h2>
+            <div class="flex items-center space-x-4 text-sm text-gray-600">
+                <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span>成交额 (左轴)</span>
+                <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-red-500 mr-2"></span>上证指数 (右轴)</span>
+            </div>
+        </div>
+        <div class="flex space-x-2 bg-gray-50 rounded-full p-1 mb-4 inline-flex border border-gray-100">
+            <button class="turnover-btn filter-btn px-5 py-1.5 rounded-full bg-blue-600 text-white text-sm font-medium active" data-range="0">全部</button>
+            <button class="turnover-btn filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-200 text-sm font-medium transition" data-range="1">近 1 年</button>
+            <button class="turnover-btn filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-200 text-sm font-medium transition" data-range="2">近 2 年</button>
+            <button class="turnover-btn filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-200 text-sm font-medium transition" data-range="3">近 3 年</button>
+            <button class="turnover-btn filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-200 text-sm font-medium transition" data-range="5">近 5 年</button>
+        </div>
+        <div id="turnoverChart" style="width: 100%; height: 380px;"></div>
+    </div>
 
-        const styles = getComputedStyle(document.documentElement);
-        function textMain() { return styles.getPropertyValue('--text-main').trim(); }
-        function textSec() { return styles.getPropertyValue('--text-secondary').trim(); }
-        function textTer() { return styles.getPropertyValue('--text-tertiary').trim(); }
-        function colorGreen() { return styles.getPropertyValue('--green').trim(); }
-        function colorRed() { return styles.getPropertyValue('--red').trim(); }
-        function colorBlue() { return styles.getPropertyValue('--primary-blue').trim(); }
-        function strokeSoft() { return styles.getPropertyValue('--stroke-soft').trim(); }
+    <!-- Insight Card -->
+    <div class="glass-card p-6 mb-6">
+        <div class="flex items-center space-x-2 mb-3">
+            <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+            <h2 class="text-lg font-bold text-gray-800">当前解读</h2>
+        </div>
+        <p class="text-gray-600 text-sm leading-relaxed" id="insightText">加载中...</p>
+    </div>
 
-        let erpDataGlobal = [];
-        let turnoverDataGlobal = [];
-        let currentRange = 0;
-        let turnoverRange = 0;
+    <!-- Footer -->
+    <p class="text-center text-xs text-gray-400 mt-2">ERP = 1/PE − 10年期国债收益率  |  数据来源：乐股乐股 · 东方财富 · 新浪财经</p>
 
-        function getFilteredData() {
-            if (currentRange === 0) return erpDataGlobal;
-            const now = new Date();
-            const cutoff = new Date(now.getFullYear() - currentRange, now.getMonth(), now.getDate());
-            const cutoffStr = cutoff.toISOString().slice(0, 10);
-            return erpDataGlobal.filter(d => d.date >= cutoffStr);
-        }
+    <!-- Loading -->
+    <div id="loadingOverlay" class="fixed inset-0 flex items-center justify-center bg-white/80 z-50">
+        <div class="text-center"><div class="spinner mx-auto mb-3"></div><p class="text-gray-500 text-sm">加载数据中...</p></div>
+    </div>
 
-        function getFilteredTurnoverData() {
-            if (turnoverRange === 0) return turnoverDataGlobal;
-            const now = new Date();
-            const cutoff = new Date(now.getFullYear() - turnoverRange, now.getMonth(), now.getDate());
-            const cutoffStr = cutoff.toISOString().slice(0, 10);
-            return turnoverDataGlobal.filter(d => d.date >= cutoffStr);
-        }
+<script>
+// ============ Data ============
+let erpData = [], turnoverData = [];
+let currentRange = 0, turnoverRange = 0;
 
-        function refreshCharts() {
-            if (window._erpChart) { window._erpChart.dispose(); }
-            if (window._peBondChart) { window._peBondChart.dispose(); }
-            initERPChart();
-            initPEBondChart();
-        }
+// ============ Helpers ============
+function filterByRange(data, range) {
+    if (range === 0) return data;
+    const now = new Date();
+    const cutoff = new Date(now.getFullYear() - range, now.getMonth(), now.getDate());
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    return data.filter(d => d.date >= cutoffStr);
+}
 
-        function initERPChart() {
-            const dom = document.getElementById('erpChart');
-            const data = getFilteredData();
-            if (!dom || !data.length) return;
-            const chart = echarts.init(dom);
-            window._erpChart = chart;
+async function loadData() {
+    try {
+        const [erpRes, turnRes] = await Promise.all([
+            fetch('/api/erp').then(r => r.json()),
+            fetch('/api/market-turnover').then(r => r.json()),
+        ]);
+        if (erpRes.success && erpRes.data.length) erpData = erpRes.data;
+        if (turnRes.success && turnRes.data.length) turnoverData = turnRes.data;
+        document.getElementById('loadingOverlay').style.display = 'none';
+        updateKPIs();
+        renderAllCharts();
+    } catch (e) {
+        document.getElementById('loadingOverlay').innerHTML = '<p class="text-red-500">加载失败，请刷新重试</p>';
+    }
+}
 
-            const dates = data.map(d => d.date);
-            const erpVals = data.map(d => d.erp);
-            const closeVals = data.map(d => d.close);
+function updateKPIs() {
+    const latest = erpData[erpData.length - 1];
+    if (!latest) return;
+    document.getElementById('kpiIndex').textContent = latest.close ? latest.close.toLocaleString() : '--';
+    document.getElementById('kpiPE').textContent = latest.pe.toFixed(1);
+    document.getElementById('kpiBond').textContent = latest.bondYield.toFixed(2) + '%';
+    document.getElementById('kpiERP').textContent = latest.erp.toFixed(2) + '%';
+    document.getElementById('dateRangeText').textContent = erpData[0].date + ' ➔ ' + latest.date;
 
-            // 标记 ERP ≈ 6 (±0.2) 红点，ERP ≈ 2 (±0.2) 绿点
-            const markRed = data.map(d => (d.erp >= 5.8 && d.erp <= 6.2) ? d.erp : null);
-            const markGreen = data.map(d => (d.erp >= 1.8 && d.erp <= 2.2) ? d.erp : null);
+    if (turnoverData.length) {
+        const t = turnoverData[turnoverData.length - 1];
+        document.getElementById('kpiTurnoverVal').textContent = (t.turnover / 10000).toFixed(2) + '万亿';
+    }
 
-            const orangeColor = '#10B981';
-            const grayColor = '#9CA3AF';
+    // Insight
+    let text = '';
+    if (latest.erp > 3) {
+        text = `当前 ERP 为 <b>${latest.erp}%</b>，处于较高水平。股票相对债券的吸引力较强，权益类资产配置性价比较高。<br>PE=${latest.pe}，国债收益率=${latest.bondYield}%，股价相对便宜。`;
+    } else if (latest.erp > 1) {
+        text = `当前 ERP 为 <b>${latest.erp}%</b>，处于中等水平。建议均衡配置股债。<br>PE=${latest.pe}，国债收益率=${latest.bondYield}%。`;
+    } else if (latest.erp > 0) {
+        text = `当前 ERP 为 <b>${latest.erp}%</b>，处于较低水平。注意风险控制。<br>PE=${latest.pe}，国债收益率=${latest.bondYield}%。`;
+    } else {
+        text = `当前 ERP 为 <b>${latest.erp}%</b>，已为负值。债券收益率高于股票收益率，权益资产不具备吸引力。`;
+    }
+    document.getElementById('insightText').innerHTML = text;
+}
 
-            const option = {
-                tooltip: {
-                    trigger: 'axis',
-                    backgroundColor: isDark() ? '#1e293b' : '#fff',
-                    borderColor: strokeSoft(),
-                    textStyle: { color: textMain(), fontSize: 12 },
-                    formatter: function(p) {
-                        let s = p[0].axisValue + '<br/>';
-                        p.forEach(function(item) {
-                            if (item.seriesName === 'ERP') s += item.marker + ' ERP: <b>' + item.value + '%</b><br/>';
-                            if (item.seriesName === '沪深300') s += item.marker + ' 沪深300: <b>' + item.value.toLocaleString() + '</b><br/>';
-                            if (item.seriesName === '≈6' && item.value != null) s += item.marker + ' ERP≈6%<br/>';
-                            if (item.seriesName === '≈2' && item.value != null) s += item.marker + ' ERP≈2%<br/>';
-                        });
-                        return s;
-                    }
-                },
-                grid: { left: 52, right: 72, top: 12, bottom: 24 },
-                xAxis: {
-                    type: 'category', data: dates,
-                    axisLine: { lineStyle: { color: strokeSoft() } },
-                    axisLabel: {
-                        color: textTer(), fontSize: 10,
-                        formatter: v => v.slice(0, 7)
-                    },
-                    axisTick: { show: false },
-                },
-                yAxis: [
-                    {
-                        type: 'value', name: 'ERP %',
-                        nameTextStyle: { color: grayColor, fontSize: 10 },
-                        axisLabel: { color: grayColor, fontSize: 10 },
-                        splitLine: { lineStyle: { color: strokeSoft(), type: 'dashed' } },
-                    },
-                    {
-                        type: 'value', name: '沪深300',
-                        nameTextStyle: { color: orangeColor, fontSize: 10 },
-                        axisLabel: {
-                            color: orangeColor, fontSize: 10,
-                            formatter: v => (v / 1000).toFixed(1) + 'k'
-                        },
-                        splitLine: { show: false },
-                    }
-                ],
-                series: [
-                    {
-                        name: 'ERP', type: 'line', yAxisIndex: 0,
-                        data: erpVals, showSymbol: false, smooth: true,
-                        lineStyle: { color: grayColor, width: 1.5 },
-                        markLine: {
-                            silent: true,
-                            data: [{ yAxis: 0, label: { formatter: '0', color: textTer(), fontSize: 10 } }],
-                            lineStyle: { color: strokeSoft(), type: 'dashed' }
-                        }
-                    },
-                    {
-                        name: '沪深300', type: 'line', yAxisIndex: 1,
-                        data: closeVals, showSymbol: false, smooth: true,
-                        lineStyle: { color: orangeColor, width: 1.5 },
-                    },
-                    {
-                        name: '≈6', type: 'scatter', yAxisIndex: 0,
-                        data: markRed, symbolSize: 5,
-                        itemStyle: { color: colorRed() },
-                    },
-                    {
-                        name: '≈2', type: 'scatter', yAxisIndex: 0,
-                        data: markGreen, symbolSize: 5,
-                        itemStyle: { color: colorGreen() },
-                    },
-                ]
-            };
-            chart.setOption(option);
-            window.addEventListener('resize', () => chart.resize());
-        }
+// ============ Charts ============
+let erpChart, peBondChart, turnChart;
 
-        function initPEBondChart() {
-            const dom = document.getElementById('peBondChart');
-            const data = getFilteredData();
-            if (!dom || !data.length) return;
-            const chart = echarts.init(dom);
-            window._peBondChart = chart;
+function renderAllCharts() {
+    renderERPChart();
+    renderPEBondChart();
+    renderTurnoverChart();
+}
 
-            const dates = data.map(d => d.date);
-            const peVals = data.map(d => d.pe);
-            const bondVals = data.map(d => d.bondYield);
+function renderERPChart() {
+    const dom = document.getElementById('erpChart');
+    const data = filterByRange(erpData, currentRange);
+    if (!data.length) return;
+    if (erpChart) erpChart.dispose();
+    erpChart = echarts.init(dom);
 
-            const option = {
-                tooltip: {
-                    trigger: 'axis',
-                    backgroundColor: isDark() ? '#1e293b' : '#fff',
-                    borderColor: strokeSoft(),
-                    textStyle: { color: textMain(), fontSize: 12 },
-                },
-                legend: {
-                    data: ['PE', '国债'],
-                    textStyle: { color: textTer(), fontSize: 11 },
-                    top: 0, right: 8,
-                },
-                grid: { left: 52, right: 72, top: 28, bottom: 24 },
-                xAxis: {
-                    type: 'category', data: dates,
-                    axisLine: { lineStyle: { color: strokeSoft() } },
-                    axisLabel: { color: textTer(), fontSize: 10, formatter: v => v.slice(0, 7) },
-                    axisTick: { show: false },
-                },
-                yAxis: [
-                    {
-                        type: 'value', name: 'PE',
-                        nameTextStyle: { color: textTer(), fontSize: 10 },
-                        axisLabel: { color: textTer(), fontSize: 10 },
-                        splitLine: { lineStyle: { color: strokeSoft(), type: 'dashed' } },
-                    },
-                    {
-                        type: 'value', name: '%',
-                        nameTextStyle: { color: textTer(), fontSize: 10 },
-                        axisLabel: { color: textTer(), fontSize: 10 },
-                        splitLine: { show: false },
-                    }
-                ],
-                series: [
-                    {
-                        name: 'PE', type: 'line', yAxisIndex: 0,
-                        data: peVals, showSymbol: false,
-                        lineStyle: { color: colorGreen(), width: 1.5 },
-                        smooth: true,
-                    },
-                    {
-                        name: '国债', type: 'line', yAxisIndex: 1,
-                        data: bondVals, showSymbol: false,
-                        lineStyle: { color: colorRed(), width: 1.5 },
-                        smooth: true,
-                    }
-                ]
-            };
-            chart.setOption(option);
-            window.addEventListener('resize', () => chart.resize());
-        }
-
-        function initTurnoverChart() {
-            const dom = document.getElementById('turnoverChart');
-            const turnoverData = getFilteredTurnoverData();
-            if (!dom || !turnoverData.length) return;
-            const chart = echarts.init(dom);
-            window._turnoverChart = chart;
-
-            const dates = turnoverData.map(d => d.date);
-            const turnovers = turnoverData.map(d => d.turnover);
-            const shIndex = turnoverData.map(d => d.shIndex);
-
-            const option = {
-                tooltip: {
-                    trigger: 'axis',
-                    backgroundColor: isDark() ? '#1e293b' : '#fff',
-                    borderColor: strokeSoft(),
-                    textStyle: { color: textMain(), fontSize: 12 },
-                    formatter: function(p) {
-                        let s = p[0].axisValue + '<br/>';
-                        p.forEach(function(item) {
-                            if (item.seriesName === '成交额') s += item.marker + ' 成交额: <b>' + (item.value/10000).toFixed(2) + '万亿</b><br/>';
-                            if (item.seriesName === '上证指数') s += item.marker + ' 上证: <b>' + item.value.toLocaleString() + '</b><br/>';
-                        });
-                        return s;
-                    }
-                },
-                legend: {
-                    data: ['成交额', '上证指数'],
-                    textStyle: { color: textTer(), fontSize: 11 },
-                    top: 0, right: 8,
-                },
-                grid: { left: 52, right: 72, top: 28, bottom: 24 },
-                xAxis: {
-                    type: 'category', data: dates,
-                    axisLine: { lineStyle: { color: strokeSoft() } },
-                    axisLabel: { color: textTer(), fontSize: 10, formatter: v => v.slice(0, 7) },
-                    axisTick: { show: false },
-                },
-                yAxis: [
-                    {
-                        type: 'value', name: '成交额(亿)',
-                        nameTextStyle: { color: '#10B981', fontSize: 10 },
-                        axisLabel: { color: '#10B981', fontSize: 10, formatter: v => (v/10000).toFixed(1) + '万亿' },
-                        splitLine: { lineStyle: { color: strokeSoft(), type: 'dashed' } },
-                    },
-                    {
-                        type: 'value', name: '上证指数',
-                        nameTextStyle: { color: colorRed(), fontSize: 10 },
-                        axisLabel: { color: colorRed(), fontSize: 10 },
-                        splitLine: { show: false },
-                    }
-                ],
-                series: [
-                    {
-                        name: '成交额', type: 'line', yAxisIndex: 0,
-                        data: turnovers, showSymbol: false, smooth: true,
-                        lineStyle: { color: '#10B981', width: 1.5 },
-                    },
-                    {
-                        name: '上证指数', type: 'line', yAxisIndex: 1,
-                        data: shIndex, showSymbol: false, smooth: true,
-                        lineStyle: { color: colorRed(), width: 1.5 },
-                    }
-                ]
-            };
-            chart.setOption(option);
-            window.addEventListener('resize', () => chart.resize());
-        }
-
-        function updateInsight(latest) {
-            const el = document.getElementById('insightText');
-            let text = '';
-            if (latest.erp > 3) {
-                text = `当前 ERP 为 <b>${latest.erp}%</b>，处于较高水平。股票相对债券的吸引力较强，权益类资产配置性价比较高。<br><br>PE=${latest.pe}，国债收益率=${latest.bondYield}%，股价相对便宜。`;
-            } else if (latest.erp > 1) {
-                text = `当前 ERP 为 <b>${latest.erp}%</b>，处于中等水平。股票相对债券无明显优势，建议均衡配置。<br><br>PE=${latest.pe}，国债收益率=${latest.bondYield}%。`;
-            } else if (latest.erp > 0) {
-                text = `当前 ERP 为 <b>${latest.erp}%</b>，处于较低水平。股票相对债券吸引力较弱，注意风险控制。<br><br>PE=${latest.pe}，国债收益率=${latest.bondYield}%。`;
-            } else {
-                text = `当前 ERP 为 <b>${latest.erp}%</b>，已为负值。债券收益率高于股票收益率（E/P），权益资产不具备吸引力。<br><br>PE=${latest.pe}，国债收益率=${latest.bondYield}%。`;
+    erpChart.setOption({
+        tooltip: {
+            trigger: 'axis', axisPointer: { type: 'cross' },
+            backgroundColor: 'rgba(255,255,255,0.96)', borderColor: '#eee',
+            textStyle: { color: '#333' }, padding: [10, 15],
+            formatter: function(p) {
+                let s = `<b>${p[0].axisValue}</b><br/>`;
+                p.forEach(function(item) {
+                    if (item.seriesName.includes('ERP')) s += `${item.marker} ERP: <b>${item.value}%</b><br/>`;
+                    if (item.seriesName.includes('沪深300')) s += `${item.marker} 沪深300: <b>${item.value}</b><br/>`;
+                });
+                return s;
             }
-            el.innerHTML = text;
-        }
+        },
+        grid: { left: '3%', right: '3%', top: 10, bottom: 60, containLabel: true },
+        xAxis: {
+            type: 'category', data: data.map(d => d.date),
+            axisLine: { lineStyle: { color: '#e5e7eb' } },
+            axisLabel: { color: '#6b7280', formatter: v => v.slice(0, 7) },
+            axisTick: { show: false },
+        },
+        yAxis: [
+            { type: 'value', name: 'ERP (%)', nameTextStyle: { color: '#3b82f6' },
+              axisLabel: { color: '#3b82f6' }, splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } } },
+            { type: 'value', name: '沪深300', nameTextStyle: { color: '#f97316' },
+              axisLabel: { color: '#f97316', formatter: v => (v/1000).toFixed(1)+'k' }, splitLine: { show: false } },
+        ],
+        dataZoom: [{
+            type: 'slider', bottom: 0, height: 28,
+            borderColor: 'transparent', backgroundColor: '#f8fafc',
+            fillerColor: 'rgba(59,130,246,0.12)',
+            handleStyle: { color: '#fff', borderColor: '#cbd5e1' },
+            textStyle: { color: 'transparent' },
+        }],
+        series: [
+            { name: 'ERP 风险溢价', type: 'line', yAxisIndex: 0, data: data.map(d => d.erp),
+              itemStyle: { color: '#3b82f6' }, lineStyle: { width: 1.5 }, showSymbol: false, smooth: true },
+            { name: '沪深300 指数', type: 'line', yAxisIndex: 1, data: data.map(d => d.close || 0),
+              itemStyle: { color: '#f97316' }, lineStyle: { width: 1.5 }, showSymbol: false, smooth: true },
+        ],
+    });
+}
 
-        function renderAll(data) {
-            erpDataGlobal = data;
-            document.getElementById('loadingEl').style.display = 'none';
-            document.getElementById('mainContent').style.display = 'block';
+function renderPEBondChart() {
+    const dom = document.getElementById('peBondChart');
+    const data = filterByRange(erpData, currentRange);
+    if (!data.length) return;
+    if (peBondChart) peBondChart.dispose();
+    peBondChart = echarts.init(dom);
 
-            const latest = data[data.length - 1];
-            const erpCard = document.querySelector('.kpi-erp');
+    peBondChart.setOption({
+        tooltip: {
+            trigger: 'axis',
+            backgroundColor: 'rgba(255,255,255,0.96)', borderColor: '#eee',
+            textStyle: { color: '#333' }, padding: [10, 15],
+        },
+        grid: { left: '3%', right: '3%', top: 10, bottom: 30, containLabel: true },
+        xAxis: {
+            type: 'category', data: data.map(d => d.date),
+            axisLine: { lineStyle: { color: '#e5e7eb' } },
+            axisLabel: { color: '#6b7280', formatter: v => v.slice(0, 7) },
+            axisTick: { show: false },
+        },
+        yAxis: [
+            { type: 'value', name: 'PE', nameTextStyle: { color: '#22c55e' },
+              axisLabel: { color: '#22c55e' }, splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } } },
+            { type: 'value', name: '%', nameTextStyle: { color: '#ef4444' },
+              axisLabel: { color: '#ef4444' }, splitLine: { show: false } },
+        ],
+        series: [
+            { name: 'PE', type: 'line', yAxisIndex: 0, data: data.map(d => d.pe),
+              itemStyle: { color: '#22c55e' }, lineStyle: { width: 1.5 }, showSymbol: false, smooth: true },
+            { name: '十年期国债', type: 'line', yAxisIndex: 1, data: data.map(d => d.bondYield),
+              itemStyle: { color: '#ef4444' }, lineStyle: { width: 1.5 }, showSymbol: false, smooth: true },
+        ],
+    });
+}
 
-            document.querySelector('.kpi-index .kpi-value').textContent = latest.close.toLocaleString();
-            document.querySelector('.kpi-pe .kpi-value').textContent = latest.pe.toFixed(1);
-            document.querySelector('.kpi-bond .kpi-value').textContent = latest.bondYield.toFixed(2) + '%';
-            document.querySelector('.kpi-erp .kpi-value').textContent = latest.erp.toFixed(2) + '%';
+function renderTurnoverChart() {
+    const dom = document.getElementById('turnoverChart');
+    const data = filterByRange(turnoverData, turnoverRange);
+    if (!data.length) return;
+    if (turnChart) turnChart.dispose();
+    turnChart = echarts.init(dom);
 
-            erpCard.classList.remove('positive', 'negative');
-            if (latest.erp > 0) erpCard.classList.add('positive');
-            else if (latest.erp < 0) erpCard.classList.add('negative');
-
-            initERPChart();
-            initPEBondChart();
-            initTurnoverChart();
-            updateInsight(latest);
-        }
-
-        async function loadTurnoverData() {
-            try {
-                const resp = await fetch('/api/market-turnover');
-                const json = await resp.json();
-                if (json.success) { turnoverDataGlobal = json.data; initTurnoverChart(); }
-            } catch (e) { console.error('成交额加载失败:', e); }
-        }
-
-        // ERP 日期筛选按钮
-        document.querySelectorAll('.filter-btn:not(.turnover-filter)').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.filter-btn:not(.turnover-filter)').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                currentRange = parseInt(this.dataset.range);
-                if (window._erpChart) { window._erpChart.dispose(); }
-                if (window._peBondChart) { window._peBondChart.dispose(); }
-                initERPChart();
-                initPEBondChart();
-            });
-        });
-
-        // 成交额日期筛选按钮
-        document.querySelectorAll('.turnover-filter').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.turnover-filter').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                turnoverRange = parseInt(this.dataset.range);
-                if (window._turnoverChart) { window._turnoverChart.dispose(); }
-                initTurnoverChart();
-            });
-        });
-
-        async function loadData() {
-            try {
-                const resp = await fetch('/api/erp');
-                const json = await resp.json();
-                if (!json.success) throw new Error(json.message);
-                if (!json.data.length) throw new Error('无数据');
-                renderAll(json.data);
-                loadTurnoverData();
-            } catch (e) {
-                document.getElementById('loadingEl').innerHTML =
-                    `<div style="color:var(--red);text-align:center;">加载失败: ${e.message}<br><small>请稍后重试</small></div>`;
+    turnChart.setOption({
+        tooltip: {
+            trigger: 'axis',
+            backgroundColor: 'rgba(255,255,255,0.96)', borderColor: '#eee',
+            textStyle: { color: '#333' }, padding: [10, 15],
+            formatter: function(p) {
+                let s = `<b>${p[0].axisValue}</b><br/>`;
+                p.forEach(function(item) {
+                    if (item.seriesName === '成交额') s += `${item.marker} 成交额: <b>${(item.value/10000).toFixed(2)}万亿</b><br/>`;
+                    if (item.seriesName === '上证指数') s += `${item.marker} 上证: <b>${item.value}</b><br/>`;
+                });
+                return s;
             }
-        }
+        },
+        grid: { left: '3%', right: '3%', top: 10, bottom: 30, containLabel: true },
+        xAxis: {
+            type: 'category', data: data.map(d => d.date),
+            axisLine: { lineStyle: { color: '#e5e7eb' } },
+            axisLabel: { color: '#6b7280', formatter: v => v.slice(0, 7) },
+            axisTick: { show: false },
+        },
+        yAxis: [
+            { type: 'value', name: '成交额(亿)', nameTextStyle: { color: '#10b981' },
+              axisLabel: { color: '#10b981', formatter: v => (v/10000).toFixed(1)+'万亿' },
+              splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } } },
+            { type: 'value', name: '上证指数', nameTextStyle: { color: '#ef4444' },
+              axisLabel: { color: '#ef4444' }, splitLine: { show: false } },
+        ],
+        series: [
+            { name: '成交额', type: 'line', yAxisIndex: 0, data: data.map(d => d.turnover),
+              itemStyle: { color: '#10b981' }, lineStyle: { width: 1.5 }, showSymbol: false, smooth: true },
+            { name: '上证指数', type: 'line', yAxisIndex: 1, data: data.map(d => d.shIndex),
+              itemStyle: { color: '#ef4444' }, lineStyle: { width: 1.5 }, showSymbol: false, smooth: true },
+        ],
+    });
+}
 
-        loadData();
-    </script>
+// ============ Filter Buttons ============
+document.querySelectorAll('.filter-btn:not(.turnover-btn)').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.filter-btn:not(.turnover-btn)').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentRange = parseInt(this.dataset.range);
+        renderERPChart();
+        renderPEBondChart();
+    });
+});
+
+document.querySelectorAll('.turnover-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.turnover-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        turnoverRange = parseInt(this.dataset.range);
+        renderTurnoverChart();
+    });
+});
+
+window.addEventListener('resize', () => {
+    if (erpChart) erpChart.resize();
+    if (peBondChart) peBondChart.resize();
+    if (turnChart) turnChart.resize();
+});
+
+// ============ Load ============
+loadData();
+</script>
 </body>
 </html>
