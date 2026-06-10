@@ -16,7 +16,7 @@
         .bg-indigo-soft { background-color: #e0e7ff; color: #6366f1; }
         .bg-orange-soft { background-color: #fff7ed; color: #f97316; }
         .filter-btn { transition: all 0.2s; }
-        .filter-btn.active { background-color: #3b82f6 !important; color: #fff !important; border-color: #3b82f6 !important; }
+        .filter-btn.active { background-color: #3b82f6 !important; color: #fff !important; }
         .spinner { width: 32px; height: 32px; border: 3px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -80,7 +80,7 @@
     <!-- Filter Buttons -->
     <div class="flex flex-wrap justify-between items-center mb-4">
         <div class="flex space-x-2 bg-white rounded-full p-1 shadow-sm border border-gray-100">
-            <button class="filter-btn px-5 py-1.5 rounded-full bg-blue-600 text-white text-sm font-medium active" data-range="0">全部</button>
+            <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition active" data-range="0">全部</button>
             <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition" data-range="1">近 1 年</button>
             <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition" data-range="2">近 2 年</button>
             <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition" data-range="3">近 3 年</button>
@@ -134,7 +134,7 @@
             </div>
         </div>
         <div class="flex space-x-2 bg-gray-50 rounded-full p-1 mb-4 inline-flex border border-gray-100">
-            <button class="turnover-btn filter-btn px-5 py-1.5 rounded-full bg-blue-600 text-white text-sm font-medium active" data-range="0">全部</button>
+            <button class="turnover-btn filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-200 text-sm font-medium transition active" data-range="0">全部</button>
             <button class="turnover-btn filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-200 text-sm font-medium transition" data-range="1">近 1 年</button>
             <button class="turnover-btn filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-200 text-sm font-medium transition" data-range="2">近 2 年</button>
             <button class="turnover-btn filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-200 text-sm font-medium transition" data-range="3">近 3 年</button>
@@ -344,7 +344,7 @@ function renderTurnoverChart() {
               axisTick: { show: false } },
         ],
         yAxis: [
-            { type: 'value', gridIndex: 0, name: '上证指数', nameTextStyle: { color: '#ef4444' },
+            { type: 'value', gridIndex: 0, scale: true, name: '上证指数', nameTextStyle: { color: '#ef4444' },
               axisLabel: { color: '#ef4444' }, splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } } },
             { type: 'value', gridIndex: 1, name: '成交额(亿)', nameTextStyle: { color: '#10b981' },
               axisLabel: { color: '#10b981', formatter: v => (v/10000).toFixed(1)+'万亿' },
