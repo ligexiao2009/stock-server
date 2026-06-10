@@ -14,6 +14,8 @@ require('dotenv').config();
 });
 
 const http = require('http');
+const https = require('https');
+const fs = require('fs');
 const cron = require('node-cron');
 const db = require('./db/db');
 
@@ -50,6 +52,87 @@ const { handleNotesRoutes } = require('./routes/notes');
 const { handleCountdownRoutes } = require('./routes/countdown');
 const { handlePositionConfigRoutes } = require('./routes/position-config');
 
+// ==================== ERP 数据获取（PE 1/PE  - 国债收益率） ====================
+let erpCache = null;
+let erpCacheTime = 0;
+const ERP_CACHE_TTL = 4 * 60 * 60 * 1000; // 4小时缓存
+
+function fetchPEData() {
+  return new Promise((resolve, reject) => {
+    // 先请求主站获取反爬 cookie
+    https.get({
+      hostname: 'www.legulegu.com',
+      path: '/stockdata',
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+    }, (mainRes) => {
+      const cookies = (mainRes.headers['set-cookie'] || []).map(c => c.split(';')[0]).join('; ');
+      let body = '';
+      mainRes.on('data', chunk => body += chunk);
+      mainRes.on('end', () => {
+        // 用 cookie 请求 PE 数据
+        https.get({
+          hostname: 'www.legulegu.com',
+          path: '/api/stockdata/index-basic-pe?indexCode=000300.SH&token=d3658c6a06f283739173ab38651547a0',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+            'Referer': 'https://www.legulegu.com/stockdata',
+            'Cookie': cookies,
+          },
+        }, (apiRes) => {
+          let apiBody = '';
+          apiRes.on('data', chunk => apiBody += chunk);
+          apiRes.on('end', () => {
+            try {
+              const data = JSON.parse(apiBody);
+              resolve(data.data || []);
+            } catch (e) {
+              reject(new Error('PE数据解析失败: ' + e.message));
+            }
+          });
+        }).on('error', reject);
+      });
+    }).on('error', reject);
+  });
+}
+
+function readBondYieldMap() {
+  const raw = JSON.parse(fs.readFileSync('/Users/yangyang/data/shinianqi.json', 'utf8'));
+  const series = raw.data['c:14583'].series[0];
+  const map = new Map();
+  for (const [date, value] of series) {
+    map.set(date, parseFloat(value));
+  }
+  return map;
+}
+
+async function getERPData() {
+  if (erpCache && Date.now() - erpCacheTime < ERP_CACHE_TTL) {
+    return erpCache;
+  }
+  const [peData, bondMap] = await Promise.all([
+    fetchPEData(),
+    Promise.resolve(readBondYieldMap()),
+  ]);
+  const result = [];
+  for (const item of peData) {
+    const date = item.date;
+    const bondYield = bondMap.get(date);
+    if (bondYield != null && item.addTtmPe > 0) {
+      result.push({
+        date,
+        close: Math.round(item.close * 100) / 100,
+        pe: Math.round(item.addTtmPe * 100) / 100,
+        bondYield,
+        erp: Math.round(((100 / item.addTtmPe) - bondYield) * 100) / 100,
+      });
+    }
+  }
+  erpCache = result;
+  erpCacheTime = Date.now();
+  console.log(`[ERP] 数据更新: ${result.length}条, 最新 PE=${result[result.length-1]?.pe} 国债=${result[result.length-1]?.bondYield}% ERP=${result[result.length-1]?.erp}%`);
+  return result;
+}
+
 const PORT = 4000;
 
 // ==================== 配置初始化 ====================
@@ -82,7 +165,7 @@ async function setupCronJob() {
   const cronTime = process.env.ALERT_TIME || configs.alertTime || '0 22 * * *';
 
   // 清理旧任务
-  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'cryptoSnapshotJob', 'snapshotBackupJob', 'aiAnalysisJob', 'assetSnapshotJob']
+  ['cronJob', 'profitCronJobs', 'confirmCronJob', 'alertCheckCronJob', 'alertResetCronJob', 'intradaySnapshotJob', 'hkCloseSnapshotJob', 'cryptoSnapshotJob', 'snapshotBackupJob', 'aiAnalysisJob', 'assetSnapshotJob', 'bondYieldUpdateJob']
     .forEach(k => { if (global[k]) { if (Array.isArray(global[k])) global[k].forEach(j => j.stop()); else global[k].stop(); } });
 
   // 基金提醒（暂时关闭微信推送）
@@ -208,6 +291,20 @@ async function setupCronJob() {
     }
   }, { timezone: 'Asia/Shanghai' });
 
+  // 每天 18:00 更新国债收益率数据
+  const bondScript = '/Users/yangyang/.codex/worktrees/737a/stock/scripts/update-bond-yield.py';
+  const bondPython = '/Users/yangyang/git/daily_stock_analysis/venv/bin/python3';
+  global.bondYieldUpdateJob = cron.schedule('0 18 * * *', () => {
+    const { exec } = require('child_process');
+    exec(`${bondPython} ${bondScript}`, (err, stdout, stderr) => {
+      if (err) console.error('[国债更新] 失败:', stderr || err.message);
+      else {
+        console.log(stdout.trim());
+        erpCache = null; // 清 ERP 缓存，下次请求重新加载
+      }
+    });
+  }, { timezone: 'Asia/Shanghai' });
+
   console.log(`定时任务已设置: 基金提醒 ${cronTime}, AI批量分析 工作日15:20, 收益计算 工作日20:00/21:00/22:00/23:00, 自动确认 09:00, 盘中快照 9:30-15:00每1分钟, 港股收盘 16:10, 资产快照 工作日23:30, 加密币 24/7每5分钟, 快照清理 每天00:05`);
 }
 
@@ -245,7 +342,7 @@ const server = http.createServer(async (req, res) => {
   if (await handleAuthRoutes(req, res)) return;
 
   // 鉴权
-  const isPublic = !req.url.startsWith('/api/') || req.url === '/api/config' || req.url.startsWith('/api/trigger-') || req.url.startsWith('/api/indices') || req.url.startsWith('/api/ai-analysis') || req.url.startsWith('/api/ai-chat') || req.url === '/api/market-status';
+  const isPublic = !req.url.startsWith('/api/') || req.url === '/api/config' || req.url.startsWith('/api/trigger-') || req.url.startsWith('/api/indices') || req.url.startsWith('/api/ai-analysis') || req.url.startsWith('/api/ai-chat') || req.url === '/api/market-status' || req.url === '/api/erp';
   const auth = isPublic ? { uid: 'default' } : authRequired(req, res);
   if (!auth) return;
   const userId = auth.uid || 'default';
@@ -312,6 +409,20 @@ const server = http.createServer(async (req, res) => {
     autoConfirmPendingTrades(invalidateCache, invalidateCacheByPrefix);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, message: '自动确认交易已触发' }));
+    return;
+  }
+
+  // ERP 风险溢价数据（无需鉴权）
+  if (req.method === 'GET' && req.url === '/api/erp') {
+    try {
+      const data = await getERPData();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, data }));
+    } catch (e) {
+      console.error('[ERP] 数据获取失败:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, message: e.message }));
+    }
     return;
   }
 

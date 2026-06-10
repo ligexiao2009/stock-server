@@ -3,6 +3,7 @@
  */
 const db = require('../db/db');
 const { fetchQuotesBatch, setHKQuoteCache } = require('../utils/quotes');
+const { checkStock, sendAlertEmail } = require('./alert-notify');
 
 /** 批量获取基金盘中估值（天天基金，并行请求） */
 async function fetchFundEstimates(codes) {
@@ -75,6 +76,8 @@ async function takeSnapshot() {
     userMap[uid].push(row);
   }
 
+  const alertItems = [];
+
   for (const [userId, rows] of Object.entries(userMap)) {
     const stocks = rows.filter(r => !r.isFund && r.code);
     const funds = rows.filter(r => r.isFund && r.code);
@@ -114,12 +117,29 @@ async function takeSnapshot() {
 
       const rawPrevClose = getPrevClose(q);
       const prevClose = stock.code.length === 5 ? rawPrevClose * hkdRate : rawPrevClose;
-      const profit = calcStockProfit(price, prevClose, stock.shares, stock.cost, tradesByRow[stock.id] || []);
+      // 港股 trade 的 netValue 也是港币，需转成人民币
+      const trades = (tradesByRow[stock.id] || []).map(t => ({
+        ...t,
+        netValue: stock.code.length === 5 ? t.netValue * hkdRate : t.netValue,
+      }));
+      const profit = calcStockProfit(price, prevClose, stock.shares, stock.cost, trades);
       const mkt = stock.shares * price;
       stockProfit += profit;
       stockMarket += mkt;
 
-      console.log(`  [股票] ${stock.code} ${stock.name} | 股数=${stock.shares} 行情价=${q.price} 汇率后=${price.toFixed(2)} 昨收=${prevClose.toFixed(2)} 收益=${profit.toFixed(0)}`);
+      console.log(`  [股票] ${stock.code} ${stock.name} | 股数=${stock.shares} 行情价=${q.price} 涨跌=${q.change?.toFixed(2)}% 汇率后=${price.toFixed(2)} 昨收=${prevClose.toFixed(2)} 收益=${profit.toFixed(0)}`);
+
+      // 涨跌幅告警检查
+      const alertResult = checkStock(stock.code, q.change || 0, dateStr);
+      if (alertResult.fire) {
+        alertItems.push({
+          code: stock.code,
+          name: stock.name,
+          changePct: q.change || 0,
+          price: q.price,
+          threshold: alertResult.threshold,
+        });
+      }
     }
 
     // 基金用天天基金估值接口
@@ -161,6 +181,11 @@ async function takeSnapshot() {
     });
 
     console.log(`[${timeStr}] 用户 ${userId}: 股票 ¥${Math.round(stockProfit)} 基金 ¥${Math.round(fundProfit)} 总计 ¥${Math.round(stockProfit + fundProfit)}`);
+  }
+
+  // 发送涨跌幅告警邮件
+  if (alertItems.length > 0) {
+    await sendAlertEmail(dateStr, alertItems);
   }
 
   console.log('========== 盘中快照完成 ==========');

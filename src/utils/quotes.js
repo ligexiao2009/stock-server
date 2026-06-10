@@ -171,13 +171,16 @@ async function fetchHKQuotesViaTickFlow(codes) {
       const code = symbol.replace('.HK', '');
       const ts = item.timestamp ? new Date(item.timestamp) : new Date();
       const dateStr = ts.toISOString().slice(0, 10).replace(/-/g, '');
+      const price = item.last_price || 0;
+      const prevClose = item.prev_close || 0;
+      const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
       result[`${code}:0`] = {
         code, isFund: false,
         name: (item.ext?.name || '').replace('[HK] ', ''),
-        price: item.last_price || 0,
-        change: (item.ext?.change_pct || 0) * 100,
+        price,
+        change,
         priceDate: dateStr,
-        prev_close: item.prev_close || 0,
+        prev_close: prevClose,
       };
     }
     console.log(`[TickFlow] 成功 codes=${codes.join(',')} count=${data.length}`);

@@ -206,7 +206,8 @@ async function handleTradeRoutes(req, res, { userId, sendCachedJson, invalidateC
 
       const newCost = isAdd
         ? (pos.cost * pos.shares + amount) / totalShares
-        : pos.cost;
+        : totalShares <= 0 ? pos.cost
+        : (pos.cost * pos.shares - amount) / totalShares;
 
       await db.updatePosition(rowId, { shares: totalShares, cost: parseFloat(newCost.toFixed(4)) });
 
