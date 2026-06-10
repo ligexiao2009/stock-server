@@ -16,6 +16,7 @@ require('dotenv').config();
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
+const path = require('path');
 const cron = require('node-cron');
 const db = require('./db/db');
 
@@ -131,6 +132,83 @@ async function getERPData() {
   erpCacheTime = Date.now();
   console.log(`[ERP] 数据更新: ${result.length}条, 最新 PE=${result[result.length-1]?.pe} 国债=${result[result.length-1]?.bondYield}% ERP=${result[result.length-1]?.erp}%`);
   return result;
+}
+
+// ==================== 两市成交额 ====================
+let turnoverCache = null;
+let turnoverCacheTime = 0;
+const TURNOVER_CACHE_TTL = 60 * 60 * 1000; // 1小时
+
+function fetchEastMoneyKline(secid) {
+  return new Promise((resolve, reject) => {
+    const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=0&beg=20200101&end=20991231&lmt=2000`;
+    https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://quote.eastmoney.com/' } }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          resolve(data.data?.klines || []);
+        } catch (e) { reject(e); }
+      });
+    }).on('error', reject);
+  });
+}
+
+async function getMarketTurnover() {
+  if (turnoverCache && Date.now() - turnoverCacheTime < TURNOVER_CACHE_TTL) return turnoverCache;
+
+  try {
+    const [sh, sz] = await Promise.all([
+      fetchEastMoneyKline('1.000001'),
+      fetchEastMoneyKline('0.399001'),
+    ]);
+
+  // Build map: date → { shTurnover, szTurnover, shClose }
+  const shMap = new Map();
+  for (const line of sh) {
+    const parts = line.split(',');
+    shMap.set(parts[0], { shTurnover: parseFloat(parts[6]) || 0, shClose: parseFloat(parts[2]) || 0 });
+  }
+  const szMap = new Map();
+  for (const line of sz) {
+    const parts = line.split(',');
+    szMap.set(parts[0], parseFloat(parts[6]) || 0);
+  }
+
+  const result = [];
+  for (const [date, shData] of shMap) {
+    const szTurnover = szMap.get(date);
+    if (szTurnover != null) {
+      result.push({
+        date,
+        turnover: Math.round((shData.shTurnover + szTurnover) / 1e8), // 亿
+        shIndex: Math.round(shData.shClose * 100) / 100,
+      });
+    }
+  }
+
+  turnoverCache = result;
+  turnoverCacheTime = Date.now();
+  const latest = result[result.length - 1];
+  console.log(`[成交额] 数据更新: ${result.length}条, 最新 ${latest?.date} 成交${latest?.turnover}亿 上证${latest?.shIndex}`);
+  // 更新本地文件作为离线备份
+  try { fs.writeFileSync(path.join(__dirname, '..', 'data', 'turnover.json'), JSON.stringify(result), 'utf8'); } catch (_) {}
+  return result;
+  } catch (e) {
+    console.error('[成交额] 东方财富请求失败:', e.message);
+    if (turnoverCache) return turnoverCache;
+    // 兜底：读本地缓存文件
+    try {
+      const raw = fs.readFileSync(path.join(__dirname, '..', 'data', 'turnover.json'), 'utf8');
+      const fallback = JSON.parse(raw);
+      if (Array.isArray(fallback) && fallback.length > 0) {
+        console.log(`[成交额] 使用本地缓存: ${fallback.length}条`);
+        return fallback;
+      }
+    } catch (_) {}
+    throw e;
+  }
 }
 
 const PORT = 4000;
@@ -319,6 +397,7 @@ async function startServer() {
     console.log('数据库连接初始化完成');
 
     await initConfig();
+    getMarketTurnover().catch(e => console.error('成交额预加载失败:', e.message));
     await setupCronJob();
 
     server.listen(PORT, () => {
@@ -346,7 +425,7 @@ const server = http.createServer(async (req, res) => {
   if (await handleAuthRoutes(req, res)) return;
 
   // 鉴权
-  const isPublic = !req.url.startsWith('/api/') || req.url === '/api/config' || req.url.startsWith('/api/trigger-') || req.url.startsWith('/api/indices') || req.url.startsWith('/api/ai-analysis') || req.url.startsWith('/api/ai-chat') || req.url === '/api/market-status' || req.url === '/api/erp';
+  const isPublic = !req.url.startsWith('/api/') || req.url === '/api/config' || req.url.startsWith('/api/trigger-') || req.url.startsWith('/api/indices') || req.url.startsWith('/api/ai-analysis') || req.url.startsWith('/api/ai-chat') || req.url === '/api/market-status' || req.url === '/api/erp' || req.url === '/api/market-turnover';
   const auth = isPublic ? { uid: 'default' } : authRequired(req, res);
   if (!auth) return;
   const userId = auth.uid || 'default';
@@ -413,6 +492,20 @@ const server = http.createServer(async (req, res) => {
     autoConfirmPendingTrades(invalidateCache, invalidateCacheByPrefix);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, message: '自动确认交易已触发' }));
+    return;
+  }
+
+  // 两市成交额（无需鉴权）
+  if (req.method === 'GET' && req.url === '/api/market-turnover') {
+    try {
+      const data = await getMarketTurnover();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, data }));
+    } catch (e) {
+      console.error('[成交额] 获取失败:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, message: e.message }));
+    }
     return;
   }
 
