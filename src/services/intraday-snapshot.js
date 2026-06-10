@@ -85,7 +85,7 @@ async function takeSnapshot() {
 
     // 批量获取行情
     const specs = rows.map(r => ({ code: r.code, isFund: r.isFund }));
-    const quotes = await fetchQuotesBatch(specs);
+    const quotes = await fetchQuotesBatch(specs, { skipCache: true });
     setHKQuoteCache(quotes);
 
     let stockProfit = 0, fundProfit = 0;

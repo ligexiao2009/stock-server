@@ -58,7 +58,8 @@ function setHKQuoteCache(quotes) {
 }
 
 /** 批量获取行情数据 */
-async function fetchQuotesBatch(items) {
+async function fetchQuotesBatch(items, opts = {}) {
+  const { skipCache = false } = opts;
   const normalizedItems = [];
   const seen = new Set();
 
@@ -86,7 +87,7 @@ async function fetchQuotesBatch(items) {
 
   for (const item of hkItems) {
     const cached = hkQuoteCache.get(item.key);
-    if (cached && now - cached.ts < HK_CACHE_TTL_MS) {
+    if (!skipCache && cached && now - cached.ts < HK_CACHE_TTL_MS) {
       quotes[item.key] = cached.data;
     } else {
       uncachedHK.push(item);
