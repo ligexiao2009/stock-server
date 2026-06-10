@@ -161,6 +161,10 @@ async function initConfig() {
 
 // ==================== 定时任务 ====================
 async function setupCronJob() {
+  if (process.env.CRON_ENABLED === 'false') {
+    console.log('定时任务已禁用 (CRON_ENABLED=false)');
+    return;
+  }
   const configs = await db.getAllConfigs();
   const cronTime = process.env.ALERT_TIME || configs.alertTime || '0 22 * * *';
 
