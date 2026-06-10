@@ -129,8 +129,8 @@
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-lg font-bold text-gray-800">A股成交额 + 上证指数</h2>
             <div class="flex items-center space-x-4 text-sm text-gray-600">
-                <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span>成交额 (左轴)</span>
-                <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-red-500 mr-2"></span>上证指数 (右轴)</span>
+                <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-red-500 mr-2"></span>上证指数 (上)</span>
+                <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span>成交额 (下)</span>
             </div>
         </div>
         <div class="flex space-x-2 bg-gray-50 rounded-full p-1 mb-4 inline-flex border border-gray-100">
@@ -330,34 +330,31 @@ function renderTurnoverChart() {
             trigger: 'axis',
             backgroundColor: 'rgba(255,255,255,0.96)', borderColor: '#eee',
             textStyle: { color: '#333' }, padding: [10, 15],
-            formatter: function(p) {
-                let s = `<b>${p[0].axisValue}</b><br/>`;
-                p.forEach(function(item) {
-                    if (item.seriesName === '成交额') s += `${item.marker} 成交额: <b>${(item.value/10000).toFixed(2)}万亿</b><br/>`;
-                    if (item.seriesName === '上证指数') s += `${item.marker} 上证: <b>${item.value}</b><br/>`;
-                });
-                return s;
-            }
         },
-        grid: { left: '3%', right: '3%', top: 10, bottom: 30, containLabel: true },
-        xAxis: {
-            type: 'category', data: data.map(d => d.date),
-            axisLine: { lineStyle: { color: '#e5e7eb' } },
-            axisLabel: { color: '#6b7280', formatter: v => v.slice(0, 7) },
-            axisTick: { show: false },
-        },
+        grid: [
+            { left: '3%', right: '8%', top: 0, height: '48%' },
+            { left: '3%', right: '8%', top: '55%', height: '45%' },
+        ],
+        xAxis: [
+            { type: 'category', gridIndex: 0, data: data.map(d => d.date),
+              axisLabel: { show: false }, axisTick: { show: false } },
+            { type: 'category', gridIndex: 1, data: data.map(d => d.date),
+              axisLine: { lineStyle: { color: '#e5e7eb' } },
+              axisLabel: { color: '#6b7280', formatter: v => v.slice(0, 7) },
+              axisTick: { show: false } },
+        ],
         yAxis: [
-            { type: 'value', name: '成交额(亿)', nameTextStyle: { color: '#10b981' },
+            { type: 'value', gridIndex: 0, name: '上证指数', nameTextStyle: { color: '#ef4444' },
+              axisLabel: { color: '#ef4444' }, splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } } },
+            { type: 'value', gridIndex: 1, name: '成交额(亿)', nameTextStyle: { color: '#10b981' },
               axisLabel: { color: '#10b981', formatter: v => (v/10000).toFixed(1)+'万亿' },
               splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } } },
-            { type: 'value', name: '上证指数', scale: true, min: 0, nameTextStyle: { color: '#ef4444' },
-              axisLabel: { color: '#ef4444' }, splitLine: { show: false } },
         ],
         series: [
-            { name: '成交额', type: 'line', yAxisIndex: 0, data: data.map(d => d.turnover),
-              itemStyle: { color: '#10b981' }, lineStyle: { width: 1.5 }, showSymbol: false, smooth: true },
-            { name: '上证指数', type: 'line', yAxisIndex: 1, data: data.map(d => d.shIndex),
+            { name: '上证指数', type: 'line', xAxisIndex: 0, yAxisIndex: 0, data: data.map(d => d.shIndex),
               itemStyle: { color: '#ef4444' }, lineStyle: { width: 1.5 }, showSymbol: false, smooth: true },
+            { name: '成交额', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: data.map(d => d.turnover),
+              itemStyle: { color: '#10b981' }, lineStyle: { width: 1.5 }, showSymbol: false, smooth: true },
         ],
     });
 }
