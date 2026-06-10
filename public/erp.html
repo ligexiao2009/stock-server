@@ -87,11 +87,8 @@
             <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition" data-range="5">近 5 年</button>
             <button class="filter-btn px-5 py-1.5 rounded-full text-gray-600 hover:bg-gray-100 text-sm font-medium transition" data-range="10">近 10 年</button>
         </div>
-        <div id="dateRange" class="flex items-center space-x-3 mt-4 md:mt-0">
-            <div class="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm flex items-center shadow-sm">
-                <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                <span id="dateRangeText">--</span>
-            </div>
+        <div class="flex items-center space-x-3 mt-4 md:mt-0">
+            <span id="dateRangeText" class="text-sm text-gray-500">--</span>
         </div>
     </div>
 
@@ -197,7 +194,7 @@ function updateKPIs() {
     document.getElementById('kpiPE').textContent = latest.pe.toFixed(1);
     document.getElementById('kpiBond').textContent = latest.bondYield.toFixed(2) + '%';
     document.getElementById('kpiERP').textContent = latest.erp.toFixed(2) + '%';
-    document.getElementById('dateRangeText').textContent = erpData[0].date + ' ➔ ' + latest.date;
+    document.getElementById('dateRangeText').textContent = erpData[0].date + ' ~ ' + latest.date;
 
     if (turnoverData.length) {
         const t = turnoverData[turnoverData.length - 1];
