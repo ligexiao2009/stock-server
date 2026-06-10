@@ -40,13 +40,14 @@ function getPrevClose(q) {
   return q.price / (1 + q.change / 100);
 }
 
-function calcStockProfit(price, prevClose, shares, cost, trades) {
+function calcStockProfit(price, prevClose, shares, cost, trades, fxRate = 1) {
   let profit = (price - prevClose) * shares;
   for (const t of trades || []) {
+    const nv = t.netValue * fxRate;
     if (t.type === 'add') {
-      profit += (prevClose - t.netValue) * t.shares;
+      profit += (prevClose - nv) * t.shares;
     } else {
-      profit += (t.netValue - prevClose) * t.shares;
+      profit += (nv - prevClose) * t.shares;
     }
   }
   return profit;
@@ -108,7 +109,8 @@ async function calculateAndSaveDailyProfit() {
         const rawPrevClose = getPrevClose(stockData);
         const prevClose = stock.code.length === 5 ? rawPrevClose * hkdRate : rawPrevClose;
         const mkt = stock.shares * price;
-        const today = calcStockProfit(price, prevClose, stock.shares, stock.cost, tradesByRow[stock.id] || []);
+        const hkRate = stock.code.length === 5 ? hkdRate : 1;
+        const today = calcStockProfit(price, prevClose, stock.shares, stock.cost, tradesByRow[stock.id] || [], hkRate);
         stockToday += today;
         details.push({ code: stock.code, name: stock.name || stock.code, type: 'stock', change: stockData.change, profit: Math.round(today), prevClose: Math.round(prevClose * 100) / 100 });
       }

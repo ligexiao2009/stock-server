@@ -321,7 +321,7 @@
             const markRed = data.map(d => (d.erp >= 5.8 && d.erp <= 6.2) ? d.erp : null);
             const markGreen = data.map(d => (d.erp >= 1.8 && d.erp <= 2.2) ? d.erp : null);
 
-            const orangeColor = '#F97316';
+            const orangeColor = '#10B981';
             const grayColor = '#9CA3AF';
 
             const option = {
@@ -504,8 +504,8 @@
                 yAxis: [
                     {
                         type: 'value', name: '成交额(亿)',
-                        nameTextStyle: { color: '#F97316', fontSize: 10 },
-                        axisLabel: { color: '#F97316', fontSize: 10, formatter: v => (v/10000).toFixed(1) + '万亿' },
+                        nameTextStyle: { color: '#10B981', fontSize: 10 },
+                        axisLabel: { color: '#10B981', fontSize: 10, formatter: v => (v/10000).toFixed(1) + '万亿' },
                         splitLine: { lineStyle: { color: strokeSoft(), type: 'dashed' } },
                     },
                     {
@@ -519,7 +519,7 @@
                     {
                         name: '成交额', type: 'line', yAxisIndex: 0,
                         data: turnovers, showSymbol: false, smooth: true,
-                        lineStyle: { color: '#F97316', width: 1.5 },
+                        lineStyle: { color: '#10B981', width: 1.5 },
                     },
                     {
                         name: '上证指数', type: 'line', yAxisIndex: 1,

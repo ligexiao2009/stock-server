@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>成交额数据抓取</title>
+<style>body{font-family:monospace;padding:20px;background:#111;color:#0f0} button{padding:10px 20px;font-size:16px;margin:10px 0} pre{background:#222;padding:10px;max-height:300px;overflow:auto}</style></head>
+<body>
+<h3>成交额数据更新</h3>
+<button onclick="fetchAll()">点我抓取沪深两市历史数据</button>
+<pre id="log"></pre>
+<button id="saveBtn" style="display:none" onclick="saveFile()">下载 turnover.json</button>
+<pre id="preview" style="display:none"></pre>
+
+<script>
+const LOG = document.getElementById('log');
+function log(s) { LOG.textContent += s + '\n'; }
+
+async function fetchEM(secid) {
+  const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=0&beg=20200101&end=20991231&lmt=2000`;
+  const resp = await fetch(url, { headers: { 'Referer': 'https://quote.eastmoney.com/' } });
+  const data = await resp.json();
+  return data.data?.klines || [];
+}
+
+async function fetchAll() {
+  log('抓取沪市...');
+  const sh = await fetchEM('1.000001');
+  log(`沪市: ${sh.length} 条`);
+
+  log('抓取深市...');
+  const sz = await fetchEM('0.399001');
+  log(`深市: ${sz.length} 条`);
+
+  const shMap = new Map();
+  for (const line of sh) {
+    const p = line.split(',');
+    shMap.set(p[0], { shT: parseFloat(p[6])||0, shClose: parseFloat(p[2])||0 });
+  }
+  const szMap = new Map();
+  for (const line of sz) {
+    const p = line.split(',');
+    szMap.set(p[0], parseFloat(p[6])||0);
+  }
+
+  const result = [];
+  for (const [date, d] of shMap) {
+    const szT = szMap.get(date);
+    if (szT != null) {
+      result.push({
+        date,
+        turnover: Math.round((d.shT + szT) / 1e8),
+        shIndex: Math.round(d.shClose * 100) / 100,
+      });
+    }
+  }
+
+  log(`\n完成: ${result.length} 条 (${result[0].date} ~ ${result[result.length-1].date})`);
+  log(`最新: ${result[result.length-1].date} 成交${result[result.length-1].turnover}亿`);
+
+  window._data = result;
+  document.getElementById('saveBtn').style.display = 'block';
+  document.getElementById('preview').style.display = 'block';
+  document.getElementById('preview').textContent = JSON.stringify(result).slice(0, 2000) + '\n...';
+}
+
+function saveFile() {
+  const blob = new Blob([JSON.stringify(window._data)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'turnover.json'; a.click();
+  log('已下载! 把文件放到 data/turnover.json 覆盖即可');
+}
+</script>
+</body></html>

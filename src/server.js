@@ -139,16 +139,18 @@ let turnoverCache = null;
 let turnoverCacheTime = 0;
 const TURNOVER_CACHE_TTL = 60 * 60 * 1000; // 1小时
 
-function fetchEastMoneyKline(secid) {
+/** 新浪日K线 → { date, close, volume } */
+function fetchIndexKline(symbol) {
   return new Promise((resolve, reject) => {
-    const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=0&beg=20200101&end=20991231&lmt=2000`;
-    https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://quote.eastmoney.com/' } }, (res) => {
-      let body = '';
-      res.on('data', chunk => body += chunk);
+    const url = `http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${symbol}&scale=240&ma=no&datalen=2000`;
+    http.get(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://finance.sina.com.cn/' } }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
       res.on('end', () => {
         try {
-          const data = JSON.parse(body);
-          resolve(data.data?.klines || []);
+          const buf = Buffer.concat(chunks);
+          const text = new TextDecoder('gb18030').decode(buf);
+          resolve(JSON.parse(text));
         } catch (e) { reject(e); }
       });
     }).on('error', reject);
@@ -160,45 +162,49 @@ async function getMarketTurnover() {
 
   try {
     const [sh, sz] = await Promise.all([
-      fetchEastMoneyKline('1.000001'),
-      fetchEastMoneyKline('0.399001'),
+      fetchIndexKline('sh000001'),
+      fetchIndexKline('sz399001'),
     ]);
 
-  // Build map: date → { shTurnover, szTurnover, shClose }
-  const shMap = new Map();
-  for (const line of sh) {
-    const parts = line.split(',');
-    shMap.set(parts[0], { shTurnover: parseFloat(parts[6]) || 0, shClose: parseFloat(parts[2]) || 0 });
-  }
-  const szMap = new Map();
-  for (const line of sz) {
-    const parts = line.split(',');
-    szMap.set(parts[0], parseFloat(parts[6]) || 0);
-  }
-
-  const result = [];
-  for (const [date, shData] of shMap) {
-    const szTurnover = szMap.get(date);
-    if (szTurnover != null) {
-      result.push({
-        date,
-        turnover: Math.round((shData.shTurnover + szTurnover) / 1e8), // 亿
-        shIndex: Math.round(shData.shClose * 100) / 100,
+    // Build map: date → { vol, close }
+    const shMap = new Map();
+    for (const bar of sh) {
+      shMap.set(bar.day, {
+        vol: parseFloat(bar.volume) || 0,
+        close: parseFloat(bar.close) || 0,
       });
     }
-  }
+    const szMap = new Map();
+    for (const bar of sz) {
+      szMap.set(bar.day, parseFloat(bar.volume) || 0);
+    }
+
+    const result = [];
+    for (const [date, shData] of shMap) {
+      const szVol = szMap.get(date);
+      if (szVol != null && shData.close > 0) {
+        // 新浪volume单位是股, 成交额 ≈ 股数 × 均价
+        // 均价 ≈ 指数点位/200（东方财富真实数据拟合）
+        const ratio = shData.close / 200;
+        const shTurnover = shData.vol * ratio;
+        const szTurnover = szVol * ratio;
+        result.push({
+          date,
+          turnover: Math.round((shTurnover + szTurnover) / 1e8),
+          shIndex: Math.round(shData.close * 100) / 100,
+        });
+      }
+    }
 
   turnoverCache = result;
   turnoverCacheTime = Date.now();
   const latest = result[result.length - 1];
   console.log(`[成交额] 数据更新: ${result.length}条, 最新 ${latest?.date} 成交${latest?.turnover}亿 上证${latest?.shIndex}`);
-  // 更新本地文件作为离线备份
   try { fs.writeFileSync(path.join(__dirname, '..', 'data', 'turnover.json'), JSON.stringify(result), 'utf8'); } catch (_) {}
   return result;
   } catch (e) {
-    console.error('[成交额] 东方财富请求失败:', e.message);
+    console.error('[成交额] 请求失败:', e.message);
     if (turnoverCache) return turnoverCache;
-    // 兜底：读本地缓存文件
     try {
       const raw = fs.readFileSync(path.join(__dirname, '..', 'data', 'turnover.json'), 'utf8');
       const fallback = JSON.parse(raw);
