@@ -217,6 +217,14 @@
                 <div class="chart-wrap chart-wrap-sm" id="peBondChart"></div>
             </div>
 
+            <div class="filter-row">
+                <button class="filter-btn turnover-filter active" data-range="0">全部</button>
+                <button class="filter-btn turnover-filter" data-range="1">近 1 年</button>
+                <button class="filter-btn turnover-filter" data-range="2">近 2 年</button>
+                <button class="filter-btn turnover-filter" data-range="3">近 3 年</button>
+                <button class="filter-btn turnover-filter" data-range="5">近 5 年</button>
+            </div>
+
             <div class="chart-card">
                 <div class="chart-title">💰 A股成交额 + 上证指数</div>
                 <div class="chart-wrap" id="turnoverChart"></div>
@@ -228,7 +236,7 @@
             </div>
         </div>
 
-        <p class="footer-note">ERP (Equity Risk Premium) = 1/PE − 10年期国债收益率<br>数据来源：乐股乐股 · 中国10年期国债</p>
+        <p class="footer-note">ERP = 1/PE − 10年期国债收益率  |  成交额为新浪成交量估算(±10%误差)<br>数据来源：乐股乐股 · 中国10年期国债 · 新浪财经</p>
     </div>
 
     <script>
@@ -272,7 +280,8 @@
 
         let erpDataGlobal = [];
         let turnoverDataGlobal = [];
-        let currentRange = 0; // 0 = 全部
+        let currentRange = 0;
+        let turnoverRange = 0;
 
         function getFilteredData() {
             if (currentRange === 0) return erpDataGlobal;
@@ -282,13 +291,19 @@
             return erpDataGlobal.filter(d => d.date >= cutoffStr);
         }
 
+        function getFilteredTurnoverData() {
+            if (turnoverRange === 0) return turnoverDataGlobal;
+            const now = new Date();
+            const cutoff = new Date(now.getFullYear() - turnoverRange, now.getMonth(), now.getDate());
+            const cutoffStr = cutoff.toISOString().slice(0, 10);
+            return turnoverDataGlobal.filter(d => d.date >= cutoffStr);
+        }
+
         function refreshCharts() {
             if (window._erpChart) { window._erpChart.dispose(); }
             if (window._peBondChart) { window._peBondChart.dispose(); }
-            if (window._turnoverChart) { window._turnoverChart.dispose(); }
             initERPChart();
             initPEBondChart();
-            initTurnoverChart();
         }
 
         function initERPChart() {
@@ -450,8 +465,7 @@
 
         function initTurnoverChart() {
             const dom = document.getElementById('turnoverChart');
-            const data = getFilteredData();
-            const turnoverData = turnoverDataGlobal.filter(d => currentRange === 0 || d.date >= data[0]?.date);
+            const turnoverData = getFilteredTurnoverData();
             if (!dom || !turnoverData.length) return;
             const chart = echarts.init(dom);
             window._turnoverChart = chart;
@@ -475,7 +489,12 @@
                         return s;
                     }
                 },
-                grid: { left: 52, right: 72, top: 12, bottom: 24 },
+                legend: {
+                    data: ['成交额', '上证指数'],
+                    textStyle: { color: textTer(), fontSize: 11 },
+                    top: 0, right: 8,
+                },
+                grid: { left: 52, right: 72, top: 28, bottom: 24 },
                 xAxis: {
                     type: 'category', data: dates,
                     axisLine: { lineStyle: { color: strokeSoft() } },
@@ -498,9 +517,9 @@
                 ],
                 series: [
                     {
-                        name: '成交额', type: 'bar', yAxisIndex: 0,
-                        data: turnovers, barWidth: '60%',
-                        itemStyle: { color: '#F97316' + '44' },
+                        name: '成交额', type: 'line', yAxisIndex: 0,
+                        data: turnovers, showSymbol: false, smooth: true,
+                        lineStyle: { color: '#F97316', width: 1.5 },
                     },
                     {
                         name: '上证指数', type: 'line', yAxisIndex: 1,
@@ -559,13 +578,27 @@
             } catch (e) { console.error('成交额加载失败:', e); }
         }
 
-        // 日期筛选按钮
-        document.querySelectorAll('.filter-btn').forEach(btn => {
+        // ERP 日期筛选按钮
+        document.querySelectorAll('.filter-btn:not(.turnover-filter)').forEach(btn => {
             btn.addEventListener('click', function() {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.filter-btn:not(.turnover-filter)').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
                 currentRange = parseInt(this.dataset.range);
-                refreshCharts();
+                if (window._erpChart) { window._erpChart.dispose(); }
+                if (window._peBondChart) { window._peBondChart.dispose(); }
+                initERPChart();
+                initPEBondChart();
+            });
+        });
+
+        // 成交额日期筛选按钮
+        document.querySelectorAll('.turnover-filter').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.turnover-filter').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                turnoverRange = parseInt(this.dataset.range);
+                if (window._turnoverChart) { window._turnoverChart.dispose(); }
+                initTurnoverChart();
             });
         });
 
