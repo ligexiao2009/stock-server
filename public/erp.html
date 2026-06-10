@@ -350,7 +350,7 @@ function renderTurnoverChart() {
             { type: 'value', name: '成交额(亿)', nameTextStyle: { color: '#10b981' },
               axisLabel: { color: '#10b981', formatter: v => (v/10000).toFixed(1)+'万亿' },
               splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } } },
-            { type: 'value', name: '上证指数', scale: true, nameTextStyle: { color: '#ef4444' },
+            { type: 'value', name: '上证指数', scale: true, min: 0, nameTextStyle: { color: '#ef4444' },
               axisLabel: { color: '#ef4444' }, splitLine: { show: false } },
         ],
         series: [
