@@ -119,7 +119,7 @@ async function fetchQuotesBatch(items, opts = {}) {
     const batch = remaining.slice(i, i + QUOTES_BATCH_SIZE);
     if (!batch.length) continue;
 
-    const query = batch.map(item => item.symbol).join(',');
+    const query = batch.map(item => `s_${item.symbol}`).join(',');
 
     try {
       const response = await fetch(`https://qt.gtimg.cn/q=${query}`);
@@ -127,12 +127,13 @@ async function fetchQuotesBatch(items, opts = {}) {
       const parsed = parseQuoteResponse(text);
 
       batch.forEach(item => {
-        const parts = parsed.get(item.symbol);
+        const parts = parsed.get(`s_${item.symbol}`);
         if (!parts) return;
         // 完整格式(88字段): [3]=价 [32]=涨跌% [33]=高 [34]=低
         // 简版(10字段):  [3]=价 [5]=涨跌%
+        // 基金始终用 [5]（无论长版短版）
         const isLong = parts.length > 30;
-        const changeIdx = isLong ? 32 : 5;
+        const changeIdx = item.isFund ? 5 : (isLong ? 32 : 5);
         quotes[item.key] = {
           code: item.code,
           isFund: item.isFund,
