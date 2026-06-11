@@ -3,7 +3,7 @@
  */
 const db = require('../db/db');
 const { fetchQuotesBatch, setHKQuoteCache } = require('../utils/quotes');
-const { checkStock, sendAlertEmail } = require('./alert-notify');
+const { checkStock, checkRebound, sendAlertEmail } = require('./alert-notify');
 
 /** 批量获取基金盘中估值（天天基金，并行请求） */
 async function fetchFundEstimates(codes) {
@@ -128,7 +128,8 @@ async function takeSnapshot() {
       stockProfit += profit;
       stockMarket += mkt;
 
-      console.log(`  [股票] ${stock.code} ${stock.name} | 股数=${stock.shares} 行情价=${q.price} 涨跌=${q.change?.toFixed(2)}% 汇率后=${price.toFixed(2)} 昨收=${prevClose.toFixed(2)} 收益=${profit.toFixed(0)}`);
+      const lowStr = q.low > 0 ? ` 最低=${q.low}` : '';
+      console.log(`  [股票] ${stock.code} ${stock.name} | 股数=${stock.shares} 行情价=${q.price} 涨跌=${q.change?.toFixed(2)}%${lowStr} 汇率后=${price.toFixed(2)} 昨收=${prevClose.toFixed(2)} 收益=${profit.toFixed(0)}`);
 
       // 涨跌幅告警检查
       const alertResult = checkStock(stock.code, q.change || 0, dateStr);
@@ -140,6 +141,19 @@ async function takeSnapshot() {
           price: q.price,
           threshold: alertResult.threshold,
         });
+      }
+      // 反弹告警检查（港股有 low 字段）
+      if (q.low > 0) {
+        const reboundResult = checkRebound(stock.code, q.price, q.low, dateStr);
+        if (reboundResult.fire) {
+          alertItems.push({
+            code: stock.code,
+            name: stock.name,
+            reboundPct: reboundResult.reboundPct,
+            price: q.price,
+            threshold: reboundResult.threshold,
+          });
+        }
       }
     }
 

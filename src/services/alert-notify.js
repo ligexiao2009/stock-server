@@ -11,10 +11,15 @@ const nodemailer = require('nodemailer');
 
 const ALERT_FILE = path.join(__dirname, '../../data/alert-sent.json');
 
-// 解析阈值
+// 解析涨跌幅阈值
 const thresholds = (process.env.ALERT_CHANGE_THRESHOLD || '5')
   .split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0)
   .sort((a, b) => b - a); // 从大到小
+
+// 解析反弹阈值
+const reboundThresholds = (process.env.ALERT_REBOUND_THRESHOLD || '3,5,8')
+  .split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0)
+  .sort((a, b) => b - a);
 
 // ========== 持久化 ==========
 function loadSent() {
@@ -48,8 +53,10 @@ async function sendAlertEmail(dateStr, items) {
 
   const to = process.env.ALERT_EMAIL || process.env.EMAIL_SENDER;
 
-  const upItems = items.filter(i => i.changePct > 0);
-  const downItems = items.filter(i => i.changePct < 0);
+  const changeItems = items.filter(i => i.changePct !== undefined);
+  const reboundItems = items.filter(i => i.reboundPct !== undefined);
+  const upItems = changeItems.filter(i => i.changePct > 0);
+  const downItems = changeItems.filter(i => i.changePct < 0);
 
   let body = '';
   if (upItems.length) {
@@ -66,7 +73,14 @@ async function sendAlertEmail(dateStr, items) {
     }
     body += '\n';
   }
-  body += `———\n阈值配置: ${thresholds.join('%、')}%\n共 ${items.length} 只股票触发提醒`;
+  if (reboundItems.length) {
+    body += `↗ 日内反弹超阈值:\n\n`;
+    for (const i of reboundItems) {
+      body += `  ${i.code} ${i.name}  +${i.reboundPct.toFixed(2)}%（从日内低点反弹，当前 ${i.price}）\n`;
+    }
+    body += '\n';
+  }
+  body += `———\n涨跌阈值: ${thresholds.join('%、')}%  |  反弹阈值: ${reboundThresholds.join('%、')}%\n共 ${items.length} 条提醒`;
 
   try {
     await transport.sendMail({
@@ -118,4 +132,35 @@ function checkStock(code, changePct, dateStr) {
   return { fire: false, threshold: 0 };
 }
 
-module.exports = { checkStock, sendAlertEmail };
+// ========== 反弹检查 ==========
+function checkRebound(code, currentPrice, lowPrice, dateStr) {
+  if (reboundThresholds.length === 0 || lowPrice <= 0 || currentPrice <= lowPrice) return { fire: false, threshold: 0 };
+
+  const reboundPct = ((currentPrice - lowPrice) / lowPrice) * 100;
+  let matched = 0;
+  for (const t of reboundThresholds) {
+    if (reboundPct >= t) { matched = t; break; }
+  }
+  if (matched === 0) return { fire: false, threshold: 0 };
+
+  const sent = loadSent();
+  if (!sent[dateStr]) sent[dateStr] = {};
+  if (!sent[dateStr].rebound) sent[dateStr].rebound = {};
+  const prevMax = sent[dateStr].rebound[code] || 0;
+
+  if (matched > prevMax) {
+    sent[dateStr].rebound[code] = matched;
+    // 清理旧数据
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    const cutoffStr = cutoff.toISOString().slice(0, 10).replace(/-/g, '');
+    for (const d of Object.keys(sent)) {
+      if (d < cutoffStr) delete sent[d];
+    }
+    saveSent(sent);
+    return { fire: true, threshold: matched, reboundPct };
+  }
+  return { fire: false, threshold: 0 };
+}
+
+module.exports = { checkStock, checkRebound, sendAlertEmail };

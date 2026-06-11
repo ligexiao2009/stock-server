@@ -119,7 +119,7 @@ async function fetchQuotesBatch(items, opts = {}) {
     const batch = remaining.slice(i, i + QUOTES_BATCH_SIZE);
     if (!batch.length) continue;
 
-    const query = batch.map(item => `s_${item.symbol}`).join(',');
+    const query = batch.map(item => item.symbol).join(',');
 
     try {
       const response = await fetch(`https://qt.gtimg.cn/q=${query}`);
@@ -127,15 +127,21 @@ async function fetchQuotesBatch(items, opts = {}) {
       const parsed = parseQuoteResponse(text);
 
       batch.forEach(item => {
-        const parts = parsed.get(`s_${item.symbol}`);
+        const parts = parsed.get(item.symbol);
         if (!parts) return;
+        // 完整格式(88字段): [3]=价 [32]=涨跌% [33]=高 [34]=低
+        // 简版(10字段):  [3]=价 [5]=涨跌%
+        const isLong = parts.length > 30;
+        const changeIdx = isLong ? 32 : 5;
         quotes[item.key] = {
           code: item.code,
           isFund: item.isFund,
           name: item.isFund ? (parts[1] ? parts[1].replace('[基金] ', '') : '') : (parts[1] || ''),
           price: parseFloat(parts[3]) || 0,
-          change: parseFloat(parts[5]) || 0,
+          change: parseFloat(parts[changeIdx]) || 0,
           priceDate: parseFundPriceDate(parts),
+          low: isLong ? (parseFloat(parts[34]) || 0) : 0,
+          high: isLong ? (parseFloat(parts[33]) || 0) : 0,
         };
       });
     } catch (error) {
@@ -184,6 +190,7 @@ async function fetchHKQuotesViaTickFlow(codes) {
         change,
         priceDate: dateStr,
         prev_close: prevClose,
+        low: item.low || 0, // 日内最低（反弹提醒用）
       };
     }
     console.log(`[TickFlow] 成功 codes=${codes.join(',')} count=${data.length}`);
