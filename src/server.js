@@ -217,7 +217,7 @@ async function getMarketTurnover() {
   }
 }
 
-const PORT = 4000;
+const PORT = process.env.SERVER_PORT || 4000;
 
 // ==================== 配置初始化 ====================
 async function initConfig() {
