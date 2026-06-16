@@ -262,7 +262,7 @@ async function setupCronJob() {
 
   // 每日收益（周一到周五 23:00）
   // 每天 20:00/21:00/22:00/23:00 各执行一次，净值更新后尽快记录
-  global.profitCronJobs = ['0 0 20 * * 1-5', '0 0 21 * * 1-5', '0 0 22 * * 1-5', '0 0 23 * * 1-5'].map(t =>
+  global.profitCronJobs = ['0 0 20 * * 1-5', '0 0 21 * * 1-5', '0 0 22 * * 1-5', '0 30 22 * * 1-5'].map(t =>
     cron.schedule(t, () => calculateAndSaveDailyProfit(), { timezone: 'Asia/Shanghai' })
   );
 
