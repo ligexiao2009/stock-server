@@ -57,6 +57,21 @@ async function handleCountdownRoutes(req, res, { userId }) {
     return true;
   }
 
+  // PUT /api/countdown-events/:id
+  if (req.method === 'PUT' && req.url.startsWith('/api/countdown-events/')) {
+    try {
+      const id = req.url.split('/api/countdown-events/')[1];
+      const { name, date } = await readBody(req);
+      if (!name || !date) { sendJson(res, 400, { error: '缺少参数' }); return true; }
+      await db.updateCountdownEvent(id, { name, date, userId });
+      sendJson(res, 200, { success: true });
+    } catch (e) {
+      console.error('更新事件失败:', e);
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
   return false;
 }
 

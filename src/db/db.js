@@ -699,6 +699,13 @@ async function deleteCountdownEvent(id, userId) {
   );
 }
 
+async function updateCountdownEvent(id, { name, date, userId }) {
+  await query(
+    'UPDATE countdown_events SET name = $1, event_date = $2 WHERE id = $3 AND user_id = $4',
+    [name, date, id, userId || 'default']
+  );
+}
+
 // ==================== 仓位管理 ====================
 
 async function getPositionConfig(userId) {
@@ -869,6 +876,7 @@ module.exports = {
   getCountdownEvents,
   createCountdownEvent,
   deleteCountdownEvent,
+  updateCountdownEvent,
 
   // Position management
   getPositionConfig,

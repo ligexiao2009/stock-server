@@ -54,19 +54,21 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
         // 如果是0股清仓状态重新加仓，检查余额并扣除现金
         if (existingPosition.shares === 0 && rowData.shares > 0) {
           const cfg = await db.getPositionConfig(userId);
-          const cashAmount = rowData.shares * rowData.cost;
-          const available = rowData.isFund ? (cfg?.alipay_cash || 0) : (cfg?.ths_cash || 0);
-          if (available < cashAmount) {
-            const account = rowData.isFund ? '支付宝' : '同花顺';
-            sendJson(res, 400, { success: false, message: "\(account)余额不足，当前¥\(available.toFixed(0)) 需要¥\(cashAmount.toFixed(0))" });
-            return true;
-          }
-          if (rowData.isFund) {
-            await db.adjustAlipayCash(userId, -cashAmount);
-            console.log(`[加仓-恢复] ${rowData.code} ${rowData.name} 基金扣减支付宝 ¥${cashAmount.toFixed(0)}`);
-          } else {
-            await db.adjustThsCash(userId, -cashAmount);
-            console.log(`[加仓-恢复] ${rowData.code} ${rowData.name} 股票扣减同花顺 ¥${cashAmount.toFixed(0)}`);
+          if (cfg) {
+            const cashAmount = rowData.shares * rowData.cost;
+            const available = rowData.isFund ? (cfg.alipay_cash || 0) : (cfg.ths_cash || 0);
+            if (available < cashAmount) {
+              const account = rowData.isFund ? '支付宝' : '同花顺';
+              sendJson(res, 400, { success: false, message: "\(account)余额不足，当前¥\(available.toFixed(0)) 需要¥\(cashAmount.toFixed(0))" });
+              return true;
+            }
+            if (rowData.isFund) {
+              await db.adjustAlipayCash(userId, -cashAmount);
+              console.log(`[加仓-恢复] ${rowData.code} ${rowData.name} 基金扣减支付宝 ¥${cashAmount.toFixed(0)}`);
+            } else {
+              await db.adjustThsCash(userId, -cashAmount);
+              console.log(`[加仓-恢复] ${rowData.code} ${rowData.name} 股票扣减同花顺 ¥${cashAmount.toFixed(0)}`);
+            }
           }
         }
         await db.updatePosition(existingPosition.id, {
@@ -77,14 +79,16 @@ async function handlePositionRoutes(req, res, { userId, sendCachedJson, invalida
           targetPrice: rowData.targetPrice || null, categoryId: rowData.categoryId || null,
         });
       } else {
-        // 检查余额是否足够
+        // 检查余额是否足够（首次添加时跳过检查）
         const cfg = await db.getPositionConfig(userId);
         const cashAmount = rowData.shares * rowData.cost;
-        const available = rowData.isFund ? (cfg?.alipay_cash || 0) : (cfg?.ths_cash || 0);
-        if (available < cashAmount) {
-          const account = rowData.isFund ? '支付宝' : '同花顺';
-          sendJson(res, 400, { success: false, message: "\(account)余额不足，当前¥\(available.toFixed(0)) 需要¥\(cashAmount.toFixed(0))" });
-          return true;
+        if (cfg) {
+          const available = rowData.isFund ? (cfg.alipay_cash || 0) : (cfg.ths_cash || 0);
+          if (available < cashAmount) {
+            const account = rowData.isFund ? '支付宝' : '同花顺';
+            sendJson(res, 400, { success: false, message: "\(account)余额不足，当前¥\(available.toFixed(0)) 需要¥\(cashAmount.toFixed(0))" });
+            return true;
+          }
         }
 
         const newId = rowData.id || Date.now().toString() + Math.random().toString(36).substr(2, 9);

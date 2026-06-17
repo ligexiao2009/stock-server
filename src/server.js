@@ -59,8 +59,8 @@ let erpCacheTime = 0;
 const ERP_CACHE_TTL = 4 * 60 * 60 * 1000; // 4小时缓存
 
 function fetchPEData() {
-  return new Promise((resolve, reject) => {
-    // 先请求主站获取反爬 cookie
+  return new Promise(async (resolve, reject) => {
+    const token = await db.getConfig('legulegu_token') || '6ab6759cd8833f9f56093a0bba03095e';
     https.get({
       hostname: 'www.legulegu.com',
       path: '/stockdata',
@@ -70,10 +70,9 @@ function fetchPEData() {
       let body = '';
       mainRes.on('data', chunk => body += chunk);
       mainRes.on('end', () => {
-        // 用 cookie 请求 PE 数据
         https.get({
           hostname: 'www.legulegu.com',
-          path: '/api/stockdata/index-basic-pe?indexCode=000300.SH&token=d3658c6a06f283739173ab38651547a0',
+          path: '/api/stockdata/index-basic-pe?indexCode=000300.SH&token=' + token,
           headers: {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
             'Referer': 'https://www.legulegu.com/stockdata',
@@ -431,7 +430,7 @@ const server = http.createServer(async (req, res) => {
   if (await handleAuthRoutes(req, res)) return;
 
   // 鉴权
-  const isPublic = !req.url.startsWith('/api/') || req.url === '/api/config' || req.url.startsWith('/api/trigger-') || req.url.startsWith('/api/indices') || req.url.startsWith('/api/ai-analysis') || req.url.startsWith('/api/ai-chat') || req.url === '/api/market-status' || req.url === '/api/erp' || req.url === '/api/market-turnover';
+  const isPublic = !req.url.startsWith('/api/') || req.url === '/api/config' || req.url.startsWith('/api/trigger-') || req.url.startsWith('/api/indices') || req.url.startsWith('/api/ai-analysis') || req.url.startsWith('/api/ai-chat') || req.url === '/api/market-status' || req.url === '/api/erp' || req.url === '/api/market-turnover' || req.url === '/api/global-indices';
   const auth = isPublic ? { uid: 'default' } : authRequired(req, res);
   if (!auth) return;
   const userId = auth.uid || 'default';
@@ -526,6 +525,24 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, message: e.message }));
     }
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/api/erp-token') {
+    const token = await db.getConfig('legulegu_token') || '';
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, token }));
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/api/erp-token') {
+    const body = await readJsonBody(req);
+    if (body && body.token) {
+      await db.setConfig('legulegu_token', body.token);
+      erpCache = null;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
     return;
   }
 
