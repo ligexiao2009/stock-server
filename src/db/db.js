@@ -77,8 +77,8 @@ function snakeToCamel(obj) {
     // Convert snake_case to camelCase
     const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 
-    // Convert numeric strings to numbers, EXCEPT for id/code/categoryId fields
-    const isIdField = ['code', 'id', 'categoryId', 'date'].includes(camelKey);
+    // Convert numeric strings to numbers, EXCEPT for id/code/categoryId/date/storage fields
+    const isIdField = ['code', 'id', 'categoryId', 'date', 'storage'].includes(camelKey);
     if (!isIdField && typeof value === 'string' && !isNaN(value) && value !== '') {
       result[camelKey] = parseFloat(value);
     } else {
@@ -798,6 +798,78 @@ async function saveBatchPlans(userId, plans) {
   }
 }
 
+// ==================== Digital Devices ====================
+
+async function getDigitalDevices(userId) {
+  const res = await query(
+    'SELECT * FROM digital_devices WHERE user_id = $1 ORDER BY purchase_date DESC',
+    [userId]
+  );
+  const devices = res.rows.map(r => snakeToCamel(r));
+  
+  // Load photos for each device
+  for (const device of devices) {
+    const photosRes = await query(
+      'SELECT * FROM digital_device_photos WHERE device_id = $1 ORDER BY sort_order',
+      [device.id]
+    );
+    device.photos = photosRes.rows.map(p => snakeToCamel(p));
+  }
+  
+  return devices;
+}
+
+async function getDigitalDevice(id, userId) {
+  const res = await query(
+    'SELECT * FROM digital_devices WHERE id = $1 AND user_id = $2',
+    [id, userId]
+  );
+  if (res.rows.length === 0) return null;
+  const device = snakeToCamel(res.rows[0]);
+  const photosRes = await query(
+    'SELECT * FROM digital_device_photos WHERE device_id = $1 ORDER BY sort_order',
+    [id]
+  );
+  device.photos = photosRes.rows.map(p => snakeToCamel(p));
+  return device;
+}
+
+async function createDigitalDevice(device) {
+  const res = await query(
+    `INSERT INTO digital_devices (id, user_id, name, brand, category, purchase_price, purchase_date, color, storage, purchase_channel, notes, status, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+    [device.id, device.userId, device.name, device.brand, device.category, device.purchasePrice, device.purchaseDate, device.color || '', device.storage || '', device.purchaseChannel || '', device.notes || '', device.status || 'inUse', device.createdAt || new Date().toISOString(), device.updatedAt || new Date().toISOString()]
+  );
+  return snakeToCamel(res.rows[0]);
+}
+
+async function updateDigitalDevice(id, userId, device) {
+  const res = await query(
+    `UPDATE digital_devices SET name = $3, brand = $4, category = $5, purchase_price = $6, purchase_date = $7, color = $8, storage = $9, purchase_channel = $10, notes = $11, status = $12, updated_at = $13
+     WHERE id = $1 AND user_id = $2 RETURNING *`,
+    [id, userId, device.name, device.brand, device.category, device.purchasePrice, device.purchaseDate, device.color || '', device.storage || '', device.purchaseChannel || '', device.notes || '', device.status || 'inUse', new Date().toISOString()]
+  );
+  return res.rows[0] ? snakeToCamel(res.rows[0]) : null;
+}
+
+async function deleteDigitalDevice(id, userId) {
+  await query('DELETE FROM digital_device_photos WHERE device_id = $1', [id]);
+  await query('DELETE FROM digital_devices WHERE id = $1 AND user_id = $2', [id, userId]);
+}
+
+async function addDigitalDevicePhoto(deviceId, userId, fileName, filePath, sortOrder) {
+  const res = await query(
+    `INSERT INTO digital_device_photos (id, user_id, device_id, file_name, file_path, sort_order, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [require('crypto').randomUUID(), userId, deviceId, fileName, filePath, sortOrder || 0, new Date().toISOString()]
+  );
+  return snakeToCamel(res.rows[0]);
+}
+
+async function deleteDigitalDevicePhoto(photoId, userId) {
+  await query('DELETE FROM digital_device_photos WHERE id = $1 AND user_id = $2', [photoId, userId]);
+}
+
 module.exports = {
   // Database connection
   pool,
@@ -887,5 +959,14 @@ module.exports = {
   syncTotalCash,
   getBatchPlans,
   saveBatchPlans,
+
+  // Digital devices
+  getDigitalDevices,
+  getDigitalDevice,
+  createDigitalDevice,
+  updateDigitalDevice,
+  deleteDigitalDevice,
+  addDigitalDevicePhoto,
+  deleteDigitalDevicePhoto,
 
 };

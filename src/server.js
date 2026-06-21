@@ -52,6 +52,7 @@ const { handleFundScreenshotRoutes, loadCodeFixMap } = require('./routes/fund-sc
 const { handleNotesRoutes } = require('./routes/notes');
 const { handleCountdownRoutes } = require('./routes/countdown');
 const { handlePositionConfigRoutes } = require('./routes/position-config');
+const { handleDigitalDeviceRoutes } = require('./routes/digital-devices');
 
 // ==================== ERP 数据获取（PE 1/PE  - 国债收益率） ====================
 let erpCache = null;
@@ -474,6 +475,7 @@ const server = http.createServer(async (req, res) => {
   if (await handleNotesRoutes(req, res, { userId })) return;
   if (await handleCountdownRoutes(req, res, { userId })) return;
   if (await handlePositionConfigRoutes(req, res, { userId })) return;
+  if (await handleDigitalDeviceRoutes(req, res, { userId })) return;
 
   // 手动触发 (测试用)
   if (req.method === 'GET' && req.url === '/api/trigger-check') {
@@ -543,6 +545,30 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  // 静态文件服务 - uploads 目录
+  if (req.method === 'GET' && req.url.startsWith('/uploads/')) {
+    const filePath = path.join(__dirname, '..', req.url);
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes = {
+      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+      '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml'
+    };
+    try {
+      if (fs.existsSync(filePath)) {
+        const data = fs.readFileSync(filePath);
+        res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+        res.end(data);
+      } else {
+        res.writeHead(404);
+        res.end('File not found');
+      }
+    } catch (e) {
+      res.writeHead(500);
+      res.end('Server error');
+    }
     return;
   }
 

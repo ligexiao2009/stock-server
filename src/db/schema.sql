@@ -303,3 +303,42 @@ CREATE VIEW positions_summary AS
 SELECT p.*, (p.shares * p.cost) AS estimated_value
 FROM positions p
 ORDER BY p.code;
+
+-- ==================== 数码设备表 ====================
+CREATE TABLE IF NOT EXISTS digital_devices (
+    id VARCHAR(50) PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    brand VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    purchase_price DECIMAL(15, 2) NOT NULL,
+    purchase_date DATE NOT NULL,
+    color VARCHAR(100) DEFAULT '',
+    storage VARCHAR(50) DEFAULT '',
+    purchase_channel VARCHAR(100) DEFAULT '',
+    notes TEXT DEFAULT '',
+    status VARCHAR(20) DEFAULT 'inUse',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_digital_devices_user_id ON digital_devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_digital_devices_category ON digital_devices(category);
+CREATE INDEX IF NOT EXISTS idx_digital_devices_purchase_date ON digital_devices(purchase_date);
+
+-- ==================== 数码设备照片表 ====================
+CREATE TABLE IF NOT EXISTS digital_device_photos (
+    id VARCHAR(50) PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    device_id VARCHAR(50) NOT NULL,
+    file_name VARCHAR(200) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (device_id) REFERENCES digital_devices(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_digital_device_photos_user_id ON digital_device_photos(user_id);
+CREATE INDEX IF NOT EXISTS idx_digital_device_photos_device_id ON digital_device_photos(device_id);
