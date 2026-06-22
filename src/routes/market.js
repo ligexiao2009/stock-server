@@ -138,12 +138,38 @@ async function handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CAC
     return true;
   }
 
-  // ========== 52etf 代理接口（无需鉴权） ==========
+  // ========== 指数行情总览（腾讯 API） ==========
   if (req.method === 'GET' && req.url === '/api/indices-top') {
     try {
-      const resp = await fetch('https://52etf.site/api/market/topstock');
-      const data = await resp.json();
-      sendJson(res, 200, data);
+      await sendCachedJson(req, res, 'indices-top', async () => {
+        const symbols = 'sh000001,sh000300,sh000905,sh000016,sh000010,sh000688,sz399001,sz399006,sz399005,sz399673,hkHSI,hkHSTECH';
+        const url = `https://qt.gtimg.cn/q=${symbols}`;
+        const resp = await fetch(url, { headers: { 'Referer': 'https://finance.qq.com' } });
+        const buf = await resp.arrayBuffer();
+        const text = new TextDecoder('gbk').decode(buf);
+        const leftListObj = {};
+        const re = /v_\w+="([^"]*)"/g;
+        let m;
+        while ((m = re.exec(text)) !== null) {
+          const raw = m[1];
+          if (!raw || raw === 'pv_none_match="1"') continue;
+          const p = raw.split('~');
+          if (p.length < 33) continue;
+          const market = parseInt(p[0]) || 0;
+          const code = p[2] || '';
+          const emCode = market === 1 ? '1.' + code : market === 51 ? '0.' + code : '100.' + code;
+          leftListObj[emCode] = {
+            f2: parseFloat(p[3]) || 0,
+            f3: parseFloat(p[32]) || 0,
+            f4: parseFloat(p[31]) || 0,
+            f12: code,
+            f13: market === 100 ? 100 : market === 1 ? 1 : 0,
+            f14: p[1] || '',
+          };
+        }
+        const thsData = { upDownData: {}, trading: {} };
+        return { leftListObj, thsData };
+      }, { ttlMs: 15000 });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }
@@ -200,17 +226,22 @@ async function handleMarketRoutes(req, res, { userId, sendCachedJson, QUOTES_CAC
         }
 
         try {
-          const etfResp = await fetch('https://52etf.site/api/market/topstock');
-          const etfData = await etfResp.json();
-          const hsTech = etfData.leftListObj?.['124.HSTECH'];
-          if (hsTech) {
-            result['hkHSTECH'] = {
-              code: 'hkHSTECH', name: hsTech.f14 || '恒生科技指数',
-              price: hsTech.f2 || 0, change: hsTech.f3 || 0,
-            };
+          const tUrl = 'https://qt.gtimg.cn/q=hkHSTECH';
+          const tResp = await fetch(tUrl, { headers: { 'Referer': 'https://finance.qq.com' } });
+          const tBuf = await tResp.arrayBuffer();
+          const tText = new TextDecoder('gbk').decode(tBuf);
+          const tMatch = /v_hkHSTECH="([^"]*)"/.exec(tText);
+          if (tMatch) {
+            const p = tMatch[1].split('~');
+            if (p.length > 5) {
+              result['hkHSTECH'] = {
+                code: 'hkHSTECH', name: p[1] || '恒生科技指数',
+                price: parseFloat(p[3]) || 0, change: parseFloat(p[32]) || 0,
+              };
+            }
           }
         } catch (e) {
-          console.error('52etf HSTECH fetch failed:', e.message);
+          console.error('Tencent HSTECH fetch failed:', e.message);
         }
 
         return result;
