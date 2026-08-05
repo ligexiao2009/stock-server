@@ -318,6 +318,8 @@ CREATE TABLE IF NOT EXISTS digital_devices (
     purchase_channel VARCHAR(100) DEFAULT '',
     notes TEXT DEFAULT '',
     status VARCHAR(20) DEFAULT 'inUse',
+    sale_price DECIMAL(15, 2) DEFAULT 0,
+    sale_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

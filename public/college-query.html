@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>安徽高考录取位次查询</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif; background: #f5f5f5; color: #333; }
+.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 16px 16px; }
+.header h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.header p { font-size: 13px; opacity: 0.85; }
+.filters { background: white; padding: 16px; margin: 12px 16px; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.filter-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+.filter-row:last-child { margin-bottom: 0; }
+.filter-label { font-size: 13px; color: #666; min-width: 50px; flex-shrink: 0; }
+.filter-input { flex: 1; padding: 8px 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+.filter-input:focus { border-color: #667eea; }
+select.filter-input { appearance: none; background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M2 4l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 10px center; padding-right: 30px; }
+.range-group { display: flex; gap: 8px; flex: 1; align-items: center; }
+.range-group span { color: #999; font-size: 13px; }
+.search-btn { width: 100%; padding: 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 12px; transition: opacity 0.2s; }
+.search-btn:active { opacity: 0.85; }
+.stats { padding: 8px 16px; font-size: 13px; color: #999; }
+.stats strong { color: #667eea; }
+.table-wrap { margin: 0 16px 20px; background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { background: #f8f9fa; }
+th { padding: 10px 12px; text-align: left; font-weight: 600; color: #666; font-size: 12px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: #f8f9fa; }
+td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+tr:last-child td { border-bottom: none; }
+tr:active { background: #f8f9ff; }
+.score { font-weight: 600; color: #e74c3c; font-family: "SF Mono", "Menlo", monospace; }
+.rank { font-family: "SF Mono", "Menlo", monospace; color: #333; }
+.tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+.tag-phys { background: #e8f4fd; color: #2196F3; }
+.tag-chem { background: #fff3e0; color: #FF9800; }
+.tag-none { background: #f3e5f5; color: #9C27B0; }
+.tag-bio { background: #e8f5e9; color: #4CAF50; }
+.empty { text-align: center; padding: 40px 20px; color: #999; }
+.empty-icon { font-size: 40px; margin-bottom: 8px; }
+.tip { padding: 16px; font-size: 12px; color: #999; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>安徽高考录取位次查询</h1>
+  <p>按位次范围筛选院校及专业组</p>
+</div>
+
+<div class="filters">
+  <div class="filter-row">
+    <span class="filter-label">位次</span>
+    <div class="range-group">
+      <input type="number" class="filter-input" id="rankMin" placeholder="起始位次" value="150000">
+      <span>~</span>
+      <input type="number" class="filter-input" id="rankMax" placeholder="结束位次" value="250000">
+    </div>
+  </div>
+  <div class="filter-row">
+    <span class="filter-label">科类</span>
+    <select class="filter-input" id="subjectFilter">
+      <option value="">全部</option>
+      <option value="物理" selected>物理科目组合</option>
+      <option value="历史">历史科目组合</option>
+    </select>
+    <span class="filter-label">选科</span>
+    <select class="filter-input" id="reqFilter">
+      <option value="">全部</option>
+      <option value="不限">不限</option>
+      <option value="化学">化学</option>
+      <option value="生物">生物</option>
+      <option value="化学+生物">化学+生物</option>
+    </select>
+  </div>
+  <div class="filter-row">
+    <span class="filter-label">搜索</span>
+    <input type="text" class="filter-input" id="searchInput" placeholder="输入学校名称...">
+  </div>
+  <button class="search-btn" onclick="doFilter()">查询</button>
+</div>
+
+<div class="stats" id="stats"></div>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>学校</th>
+        <th>专业组</th>
+        <th>选科</th>
+        <th>最低分</th>
+        <th>位次</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none;">
+    <div class="empty-icon">📋</div>
+    <div>暂无数据</div>
+  </div>
+</div>
+
+<div class="tip">
+  💡 将整理好的数据粘贴到页面底部 data 变量中即可使用
+</div>
+
+<script>
+// ========== 数据区 ==========
+// 格式: { school: "学校名称", group: "专业组号", req: "选科要求", subject: "物理/历史", score: 最低分, rank: 位次 }
+const data = [
+  // --- 在这里粘贴你的数据 ---
+  // 示例数据:
+  // { school: "安徽工业大学", group: "007", req: "化学", subject: "物理", score: 577, rank: 43905 },
+  // { school: "安徽建筑大学", group: "008", req: "不限", subject: "物理", score: 536, rank: 86290 },
+  // { school: "安徽理工大学", group: "009", req: "化学+生物", subject: "物理", score: 545, rank: 75333 },
+];
+
+function doFilter() {
+  const rankMin = parseInt(document.getElementById('rankMin').value) || 0;
+  const rankMax = parseInt(document.getElementById('rankMax').value) || 999999;
+  const subject = document.getElementById('subjectFilter').value;
+  const req = document.getElementById('reqFilter').value;
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  let filtered = data.filter(d => {
+    if (d.rank < rankMin || d.rank > rankMax) return false;
+    if (subject && !d.subject.includes(subject)) return false;
+    if (req && !d.req.includes(req)) return false;
+    if (search && !d.school.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => a.rank - b.rank);
+
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('empty');
+  const stats = document.getElementById('stats');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    stats.innerHTML = '';
+    return;
+  }
+
+  empty.style.display = 'none';
+  stats.innerHTML = `共 <strong>${filtered.length}</strong> 条结果`;
+
+  tbody.innerHTML = filtered.map(d => {
+    let reqTag = '';
+    if (d.req.includes('不限')) reqTag = '<span class="tag tag-none">不限</span>';
+    else if (d.req.includes('化学') && d.req.includes('生物')) reqTag = '<span class="tag tag-bio">化+生</span>';
+    else if (d.req.includes('化学')) reqTag = '<span class="tag tag-chem">化学</span>';
+    else if (d.req.includes('生物')) reqTag = '<span class="tag tag-bio">生物</span>';
+    else reqTag = `<span class="tag tag-none">${d.req}</span>`;
+
+    return `<tr>
+      <td><strong>${d.school}</strong></td>
+      <td>${d.group}</td>
+      <td>${reqTag}</td>
+      <td class="score">${d.score}</td>
+      <td class="rank">${d.rank.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+
+// 页面加载后自动执行一次
+doFilter();
+</script>
+</body>
+</html>

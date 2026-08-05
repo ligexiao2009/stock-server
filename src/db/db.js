@@ -836,18 +836,18 @@ async function getDigitalDevice(id, userId) {
 
 async function createDigitalDevice(device) {
   const res = await query(
-    `INSERT INTO digital_devices (id, user_id, name, brand, category, purchase_price, purchase_date, color, storage, purchase_channel, notes, status, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-    [device.id, device.userId, device.name, device.brand, device.category, device.purchasePrice, device.purchaseDate, device.color || '', device.storage || '', device.purchaseChannel || '', device.notes || '', device.status || 'inUse', device.createdAt || new Date().toISOString(), device.updatedAt || new Date().toISOString()]
+    `INSERT INTO digital_devices (id, user_id, name, brand, category, purchase_price, purchase_date, color, storage, purchase_channel, notes, status, sale_price, sale_date, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+    [device.id, device.userId, device.name, device.brand, device.category, device.purchasePrice, device.purchaseDate, device.color || '', device.storage || '', device.purchaseChannel || '', device.notes || '', device.status || 'inUse', device.salePrice || 0, device.saleDate || null, device.createdAt || new Date().toISOString(), device.updatedAt || new Date().toISOString()]
   );
   return snakeToCamel(res.rows[0]);
 }
 
 async function updateDigitalDevice(id, userId, device) {
   const res = await query(
-    `UPDATE digital_devices SET name = $3, brand = $4, category = $5, purchase_price = $6, purchase_date = $7, color = $8, storage = $9, purchase_channel = $10, notes = $11, status = $12, updated_at = $13
+    `UPDATE digital_devices SET name = $3, brand = $4, category = $5, purchase_price = $6, purchase_date = $7, color = $8, storage = $9, purchase_channel = $10, notes = $11, status = $12, sale_price = $13, sale_date = $14, updated_at = $15
      WHERE id = $1 AND user_id = $2 RETURNING *`,
-    [id, userId, device.name, device.brand, device.category, device.purchasePrice, device.purchaseDate, device.color || '', device.storage || '', device.purchaseChannel || '', device.notes || '', device.status || 'inUse', new Date().toISOString()]
+    [id, userId, device.name, device.brand, device.category, device.purchasePrice, device.purchaseDate, device.color || '', device.storage || '', device.purchaseChannel || '', device.notes || '', device.status || 'inUse', device.salePrice || 0, device.saleDate || null, new Date().toISOString()]
   );
   return res.rows[0] ? snakeToCamel(res.rows[0]) : null;
 }

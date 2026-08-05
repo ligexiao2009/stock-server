@@ -29,27 +29,48 @@ function beijingTime() {
     + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
 }
 
-/** 获取基金实时估算 */
+/** 获取基金实时估算（天天基金新接口 FundValuationLast） */
 async function fetchFundEstimate(fundCode) {
   try {
-    const url = `http://fundgz.1234567.com.cn/js/${fundCode}.js`;
-    const response = await fetch(url);
-    const text = await response.text();
-    const jsonMatch = text.match(/jsonpgz\((\{.*?\})\s*\);?/s);
-    if (jsonMatch) {
-      const data = JSON.parse(jsonMatch[1]);
+    const url = `https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast?FCODES=${fundCode}&FIELDS=FCODE,SHORTNAME,GSZ,GSZZL,GZTIME,NAV,PDATE`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const json = await resp.json();
+    if (json.success && json.data && json.data.length > 0) {
+      const d = json.data[0];
       return {
         success: true,
-        fundCode: data.fundcode,
-        fundName: data.name,
-        estimateValue: parseFloat(data.gsz) || 0,
-        estimateChange: parseFloat(data.gszzl) || 0,
-        estimateTime: data.gztime || '',
+        fundCode: d.FCODE,
+        fundName: d.SHORTNAME,
+        estimateValue: d.GSZ ?? 0,
+        estimateChange: d.GSZZL ?? 0,
+        estimateTime: d.GZTIME || '',
       };
     }
-    return { success: false, error: '解析失败' };
+    return { success: false, error: '无数据' };
   } catch (error) {
     return { success: false, error: error.message };
+  }
+}
+
+/** 批量获取基金实时估算（天天基金新接口，单次请求） */
+async function fetchFundEstimatesBatch(fundCodes) {
+  try {
+    const url = `https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast?FCODES=${fundCodes.join(',')}&FIELDS=FCODE,SHORTNAME,GSZ,GSZZL,GZTIME,NAV,PDATE`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const json = await resp.json();
+    if (json.success && json.data) {
+      return json.data.map(d => ({
+        success: d.GSZ != null,
+        fundCode: d.FCODE,
+        fundName: d.SHORTNAME,
+        estimateValue: d.GSZ ?? 0,
+        estimateChange: d.GSZZL ?? 0,
+        estimateTime: d.GZTIME || '',
+      }));
+    }
+    return fundCodes.map(code => ({ success: false, fundCode: code, error: '无数据' }));
+  } catch (error) {
+    return fundCodes.map(code => ({ success: false, fundCode: code, error: error.message }));
   }
 }
 
@@ -77,7 +98,7 @@ async function handleFundRoutes(req, res, { userId, sendCachedJson, invalidateCa
         sendJson(res, 400, { success: false, error: 'fundCodes 必须是数组' });
         return true;
       }
-      const results = await Promise.all(fundCodes.map(code => fetchFundEstimate(code)));
+      const results = await fetchFundEstimatesBatch(fundCodes);
       sendJson(res, 200, { success: true, results });
     } catch (e) {
       sendJson(res, 500, { success: false, error: e.message });

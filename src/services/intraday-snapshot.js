@@ -5,24 +5,25 @@ const db = require('../db/db');
 const { fetchQuotesBatch, setHKQuoteCache } = require('../utils/quotes');
 const { checkStock, checkRebound, sendAlertEmail } = require('./alert-notify');
 
-/** 批量获取基金盘中估值（天天基金，并行请求） */
+/** 批量获取基金盘中估值（天天基金新接口 FundValuationLast，单次批量请求） */
 async function fetchFundEstimates(codes) {
   const results = {};
-  const tasks = codes.map(async code => {
-    try {
-      const resp = await fetch(`http://fundgz.1234567.com.cn/js/${code}.js`);
-      const text = await resp.text();
-      const m = text.match(/jsonpgz\((\{.*?\})\s*\);?/s);
-      if (m) {
-        const d = JSON.parse(m[1]);
-        results[code] = {
-          estimateValue: parseFloat(d.gsz) || 0,
-          estimateChange: parseFloat(d.gszzl) || 0,
-        };
+  if (codes.length === 0) return results;
+  try {
+    const url = `https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast?FCODES=${codes.join(',')}&FIELDS=FCODE,GSZ,GSZZL,GZTIME`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const json = await resp.json();
+    if (json.success && json.data) {
+      for (const d of json.data) {
+        if (d.GSZ != null) {
+          results[d.FCODE] = {
+            estimateValue: d.GSZ,
+            estimateChange: d.GSZZL ?? 0,
+          };
+        }
       }
-    } catch (_) {}
-  });
-  await Promise.all(tasks);
+    }
+  } catch (_) {}
   return results;
 }
 

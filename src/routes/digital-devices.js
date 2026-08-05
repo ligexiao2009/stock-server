@@ -102,6 +102,8 @@ async function handleDigitalDeviceRoutes(req, res, { userId }) {
         purchaseChannel: body.purchaseChannel || body.purchase_channel || '',
         notes: body.notes || '',
         status: body.status || 'inUse',
+        salePrice: body.salePrice || body.sale_price || 0,
+        saleDate: body.saleDate || body.sale_date || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -129,7 +131,9 @@ async function handleDigitalDeviceRoutes(req, res, { userId }) {
         storage: body.storage || '',
         purchaseChannel: body.purchaseChannel || body.purchase_channel || '',
         notes: body.notes || '',
-        status: body.status || 'inUse'
+        status: body.status || 'inUse',
+        salePrice: body.salePrice || body.sale_price || 0,
+        saleDate: body.saleDate || body.sale_date || null
       };
       const updated = await db.updateDigitalDevice(id, userId, device);
       if (!updated) { sendJson(res, 404, { error: '设备不存在' }); return true; }
