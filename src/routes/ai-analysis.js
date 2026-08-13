@@ -141,9 +141,12 @@ async function handleAIAnalysisRoutes(req, res) {
   if (req.method === 'POST' && req.url === '/api/ai-config') {
     try {
       const db = require('../db/db');
-      const { marketNewsEnabled } = parseJson(await readBody(req));
+      const { marketNewsEnabled, aiAnalysisEnabled } = parseJson(await readBody(req));
       if (marketNewsEnabled !== undefined) {
         await db.setConfig('market_news_enabled', marketNewsEnabled ? 'true' : 'false');
+      }
+      if (aiAnalysisEnabled !== undefined) {
+        await db.setConfig('ai_analysis_enabled', aiAnalysisEnabled ? 'true' : 'false');
       }
       sendJson(res, 200, { success: true });
     } catch (e) { sendJson(res, 500, { error: e.message }); }
@@ -155,7 +158,8 @@ async function handleAIAnalysisRoutes(req, res) {
     try {
       const db = require('../db/db');
       const val = await db.getConfig('market_news_enabled');
-      sendJson(res, 200, { marketNewsEnabled: val !== 'false' });
+      const analysisVal = await db.getConfig('ai_analysis_enabled');
+      sendJson(res, 200, { marketNewsEnabled: val !== 'false', aiAnalysisEnabled: analysisVal !== 'false' });
     } catch (e) { sendJson(res, 500, { error: e.message }); }
     return true;
   }

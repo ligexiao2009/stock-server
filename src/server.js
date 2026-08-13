@@ -316,11 +316,16 @@ async function setupCronJob() {
   // AI 批量分析持仓股票（工作日 15:20，收盘后触发）
   global.aiAnalysisJob = cron.schedule('20 15 * * 1-5', async () => {
     try {
+      const analysisEnabled = await db.getConfig('ai_analysis_enabled');
+      if (analysisEnabled === 'false') {
+        console.log('[AI分析] 已禁用，跳过批量分析');
+        return;
+      }
       const { exec } = require('child_process');
       const positions = await db.getPositions() || [];
       const codes = [...new Set(
         positions
-          .filter(p => !p.isFund && /^\d+$/.test(p.code))
+          .filter(p => !p.isFund && p.shares > 0 && /^\d+$/.test(p.code))
           .map(p => p.code)
           .filter(Boolean)
       )];
