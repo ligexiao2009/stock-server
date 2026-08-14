@@ -109,7 +109,9 @@ async function takeSnapshot() {
       }
 
       const q = quotes[`${stock.code}:0`];
-      if (!q || q.price <= 0 || stock.shares <= 0) {
+      const stockTrades = tradesByRow[stock.id] || [];
+      // 已清仓（shares==0）但当天有交易的股票也要计入已实现收益
+      if (!q || q.price <= 0 || (stock.shares <= 0 && stockTrades.length === 0)) {
         console.log(`  [跳过] ${stock.code} ${stock.name} 行情无效 price=${q?.price} shares=${stock.shares}`);
         continue;
       }
@@ -120,7 +122,7 @@ async function takeSnapshot() {
       const rawPrevClose = getPrevClose(q);
       const prevClose = stock.code.length === 5 ? rawPrevClose * hkdRate : rawPrevClose;
       // 港股 trade 的 netValue 也是港币，需转成人民币
-      const trades = (tradesByRow[stock.id] || []).map(t => ({
+      const trades = stockTrades.map(t => ({
         ...t,
         netValue: stock.code.length === 5 ? t.netValue * hkdRate : t.netValue,
       }));

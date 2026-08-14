@@ -103,14 +103,16 @@ async function calculateAndSaveDailyProfit() {
       if (stock.code.length === 6 && !marketStatus.aStockOpen) continue;
 
       const stockData = await fetchStockPrice(stock.code);
-      if (stockData && stockData.price > 0 && stock.shares > 0) {
+      // 已清仓（shares==0）但当天有交易的股票也要计入已实现收益
+      const stockTrades = tradesByRow[stock.id] || [];
+      if (stockData && stockData.price > 0 && (stock.shares > 0 || stockTrades.length > 0)) {
         let price = stockData.price;
         if (stock.code.length === 5) price *= hkdRate;
         const rawPrevClose = getPrevClose(stockData);
         const prevClose = stock.code.length === 5 ? rawPrevClose * hkdRate : rawPrevClose;
         const mkt = stock.shares * price;
         const hkRate = stock.code.length === 5 ? hkdRate : 1;
-        const today = calcStockProfit(price, prevClose, stock.shares, stock.cost, tradesByRow[stock.id] || [], hkRate);
+        const today = calcStockProfit(price, prevClose, stock.shares, stock.cost, stockTrades, hkRate);
         stockToday += today;
         details.push({ code: stock.code, name: stock.name || stock.code, type: 'stock', change: stockData.change, profit: Math.round(today), prevClose: Math.round(prevClose * 100) / 100 });
       }
