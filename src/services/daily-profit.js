@@ -55,6 +55,12 @@ function calcStockProfit(price, prevClose, shares, cost, trades, fxRate = 1) {
 
 async function calculateAndSaveDailyProfit() {
   console.log('\n========== 开始计算每日收益 ==========');
+  // 休市日（周末/节假日 A股港股均休市）跳过，不生成当日记录
+  const marketStatus = await checkMarketOpen();
+  if (!marketStatus.aStockOpen && !marketStatus.hkStockOpen) {
+    console.log('休市日（A股/港股均休市），跳过收益计算');
+    return;
+  }
   const allRows = await db.getPositions();
   const now = new Date();
   const dateStr = now.getFullYear().toString() + '-' +
@@ -88,7 +94,6 @@ async function calculateAndSaveDailyProfit() {
 
     const hkdRate = parseFloat(await db.getConfig('hkd_cny_rate')) || 0.92;
     const usdRate = parseFloat(await db.getConfig('crypto_fx')) || 7.2;
-    const marketStatus = await checkMarketOpen();
 
     const todayTrades = stocks.length > 0 ? await db.getTodayTrades(userId, todayStr) : [];
     const tradesByRow = {};
