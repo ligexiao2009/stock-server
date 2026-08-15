@@ -40,6 +40,8 @@ function getPrevClose(q) {
   return q.price / (1 + q.change / 100);
 }
 
+// ⚠️ 与 iOS StockApp/Models/ProfitCalculator.swift 和 services/intraday-snapshot.js 的 calcStockProfit 算法保持一致，
+// 改动时必须三处同步修改。
 function calcStockProfit(price, prevClose, shares, cost, trades, fxRate = 1) {
   let profit = (price - prevClose) * shares;
   for (const t of trades || []) {
